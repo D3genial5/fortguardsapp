@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1048827407544",
+    "project_id": "fortguard-9bba5",
+    "storage_bucket": "fortguard-9bba5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1048827407544:android:51c9f4da181132e208184d",
+        "android_client_info": {
+          "package_name": "com.example.fortguardsapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB54Uz8WJWYnLy7ovMwZkeOiGglK-Td67U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
