@@ -43,3 +43,13 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# --- Seguridad / Claves privadas ---
+serviceAccount*.json
+*.p8
+*.pem
+*.key
+*.keystore
+.env
+# Archivos locales de configuración
+/devtools_options.yaml
