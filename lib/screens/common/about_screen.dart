@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../widgets/back_handler.dart';
 
 class AboutScreen extends StatelessWidget {
   const AboutScreen({super.key});
@@ -6,7 +7,8 @@ class AboutScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Scaffold(
+    return BackHandler(
+      child: Scaffold(
       appBar: AppBar(
         title: const Text('Acerca de FortGuards'),
         leading: const BackButton(),
@@ -24,13 +26,14 @@ class AboutScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: scheme.surfaceVariant.withOpacity(0.4),
+                color: scheme.surfaceContainerHighest.withOpacity(0.4),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text('Versión 1.0.0', style: Theme.of(context).textTheme.bodyMedium),
             ),
           ],
         ),
+      ),
       ),
     );
   }

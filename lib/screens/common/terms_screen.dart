@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import '../../widgets/back_handler.dart';
 
 class TermsScreen extends StatelessWidget {
   const TermsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return BackHandler(
+      child: Scaffold(
       appBar: AppBar(
         title: const Text('Términos y condiciones'),
         leading: const BackButton(),
@@ -19,6 +21,7 @@ class TermsScreen extends StatelessWidget {
             'Los datos son tratados conforme a la normativa vigente.',
           ),
         ),
+      ),
       ),
     );
   }

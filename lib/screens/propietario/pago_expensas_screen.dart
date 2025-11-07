@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:gal/gal.dart';
 import 'package:http/http.dart' as http;
 import '../../models/propietario_model.dart';
+import '../../widgets/back_handler.dart';
 
 class PagoExpensasScreen extends StatefulWidget {
   final PropietarioModel propietario;
@@ -309,7 +310,8 @@ class _PagoExpensasScreenState extends State<PagoExpensasScreen> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     
-    return Scaffold(
+    return BackHandler(
+      child: Scaffold(
       appBar: AppBar(
         title: const Text('Pago de Expensas'),
         backgroundColor: colorScheme.primary,
@@ -673,6 +675,7 @@ class _PagoExpensasScreenState extends State<PagoExpensasScreen> {
               backgroundColor: Theme.of(context).colorScheme.primary,
             )
           : null,
+      ),
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../widgets/back_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SeleccionAccionScreen extends StatelessWidget {
@@ -7,7 +8,8 @@ class SeleccionAccionScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return BackHandler(
+      child: Scaffold(
       appBar: AppBar(
         title: const Text('Visita'),
         leading: const BackButton(),
@@ -59,6 +61,7 @@ class SeleccionAccionScreen extends StatelessWidget {
             ),
           ],
         ),
+      ),
       ),
     );
   }

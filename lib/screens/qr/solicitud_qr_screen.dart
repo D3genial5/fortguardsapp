@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../widgets/back_handler.dart';
 
 import '../../models/solicitud_model.dart';
 import '../../services/solicitud_remote_service.dart';
@@ -90,7 +91,8 @@ class _SolicitudQrScreenState extends State<SolicitudQrScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return BackHandler(
+      child: Scaffold(
       appBar: AppBar(
         title: const Text('Solicitud de ingreso'),
         leading: IconButton(
@@ -186,6 +188,7 @@ class _SolicitudQrScreenState extends State<SolicitudQrScreen> {
           ],
         ),
       ),
+    ),
     ),
     ),
     ),

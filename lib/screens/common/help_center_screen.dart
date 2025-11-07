@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import '../../widgets/back_handler.dart';
 
 class HelpCenterScreen extends StatelessWidget {
   const HelpCenterScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return BackHandler(
+      child: Scaffold(
       appBar: AppBar(
         title: const Text('Centro de ayuda'),
         leading: const BackButton(),
@@ -27,6 +29,7 @@ class HelpCenterScreen extends StatelessWidget {
             ),
           ],
         ),
+      ),
       ),
     );
   }

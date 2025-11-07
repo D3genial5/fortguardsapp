@@ -2,12 +2,15 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../widgets/back_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 //import '../../models/propietario_model.dart';
 import '../../services/propietario_auth_service.dart';
 import '../../services/session_service.dart';
 import '../../services/notification_service.dart';
+// import '../../services/push_notification_service.dart';  // Temporarily disabled
+// import '../../services/background_sync_service.dart';  // Temporarily disabled
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -149,7 +152,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return BackHandler(
+      child: Scaffold(
       appBar: AppBar(
         title: const Text('PROPIETARIO'),
         leading: IconButton(
@@ -190,6 +194,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ],
         ),
+      ),
       ),
     );
   }

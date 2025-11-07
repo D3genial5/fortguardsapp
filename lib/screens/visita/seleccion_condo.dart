@@ -2,13 +2,15 @@ import 'package:flutter/material.dart';
 import '../../services/condominio_service.dart';
 import 'seleccion_casa_screen.dart';
 import 'package:go_router/go_router.dart';
+import '../../widgets/back_handler.dart';
 
 class SeleccionCondominioScreen extends StatelessWidget {
   const SeleccionCondominioScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return BackHandler(
+      child: Scaffold(
       appBar: AppBar(
         title: const Text('Entrada (por código de casa)'),
         leading: IconButton(
@@ -57,6 +59,7 @@ class SeleccionCondominioScreen extends StatelessWidget {
             );
           },
         ),
+      ),
       ),
     );
   }

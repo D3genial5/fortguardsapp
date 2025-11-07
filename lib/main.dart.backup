@@ -5,29 +5,24 @@ import 'firebase_options.dart';
 import 'app.dart';
 
 Future<void> main() async {
-  // Paso 1: Binding
+  // Inicialización básica
   WidgetsFlutterBinding.ensureInitialized();
-  debugPrint('✅ Step 1: Flutter binding initialized');
   
-  // Paso 2: Firebase
   try {
+    // Inicializar Firebase con opciones específicas
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
-    debugPrint('✅ Step 2: Firebase initialized');
-  } catch (e) {
-    debugPrint('❌ Firebase error: $e');
-    // Continuar sin Firebase
-  }
-  
-  // Paso 3: Localización
-  try {
+    print('✅ Firebase initialized successfully');
+    
+    // Inicializar localización
     await initializeDateFormatting('es_ES', null);
-    debugPrint('✅ Step 3: Date formatting initialized');
-  } catch (e) {
-    debugPrint('❌ Date formatting error: $e');
+    print('✅ Date formatting initialized');
+    
+  } catch (e, stackTrace) {
+    print('❌ Error during initialization: $e');
+    print('Stack trace: $stackTrace');
   }
   
-  debugPrint('🚀 Starting app...');
   runApp(const FortGuards());
 }

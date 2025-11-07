@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../widgets/back_handler.dart';
 
 class RegistroVisitaScreen extends StatefulWidget {
   const RegistroVisitaScreen({super.key});
@@ -36,12 +37,13 @@ class _RegistroVisitaScreenState extends State<RegistroVisitaScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        elevation: 0,
-        title: const Text('Registro de Visitante', style: TextStyle(fontWeight: FontWeight.bold)),
-      ),
-      body: Padding(
+    return BackHandler(
+      child: Scaffold(
+        appBar: AppBar(
+          elevation: 0,
+          title: const Text('Registro de Visitante', style: TextStyle(fontWeight: FontWeight.bold)),
+        ),
+        body: Padding(
         padding: const EdgeInsets.all(16),
           child: SingleChildScrollView(child: Column(
             children: [
@@ -113,6 +115,7 @@ class _RegistroVisitaScreenState extends State<RegistroVisitaScreen> {
             ],
           ),
         ),
+      ),
       ),
     );
   }

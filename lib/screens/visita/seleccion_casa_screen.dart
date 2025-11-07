@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/condominio_service.dart';
 import 'ingreso_casa_screen.dart';
+import '../../widgets/back_handler.dart';
 
 class SeleccionCasaScreen extends StatelessWidget {
   final String condominioId;
@@ -9,7 +10,8 @@ class SeleccionCasaScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return BackHandler(
+      child: Scaffold(
       appBar: AppBar(title: Text('Entrada - $condominioId')),
       body: Padding(
         padding: const EdgeInsets.all(16),
@@ -52,6 +54,7 @@ class SeleccionCasaScreen extends StatelessWidget {
             );
           },
         ),
+      ),
       ),
     );
   }

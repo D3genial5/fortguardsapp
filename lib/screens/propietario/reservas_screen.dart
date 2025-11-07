@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../widgets/back_handler.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../../models/propietario_model.dart';
@@ -857,7 +858,8 @@ class _ReservasScreenState extends State<ReservasScreen> with SingleTickerProvid
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return BackHandler(
+      child: Scaffold(
       appBar: AppBar(
         title: const Text('Reservas'),
         bottom: TabBar(
@@ -879,6 +881,7 @@ class _ReservasScreenState extends State<ReservasScreen> with SingleTickerProvid
                 _buildAreasTab(),
               ],
             ),
+      ),
     );
   }
 

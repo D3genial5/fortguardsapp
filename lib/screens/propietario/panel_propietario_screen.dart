@@ -4,12 +4,14 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../widgets/back_handler.dart';
 
 import '../../models/propietario_model.dart';
 import '../../core/codigo_casa_util.dart';
 
 import 'package:fortguardsapp/screens/propietario/pago_expensas_screen.dart';
 import 'package:fortguardsapp/screens/propietario/gestionar_solicitudes_screen.dart';
+import 'package:fortguardsapp/screens/propietario/mis_qrs_invitados_screen.dart';
 import 'notificaciones_prop_screen.dart';
 import 'reservas_screen.dart';
 import '../../theme_manager.dart';
@@ -703,12 +705,21 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
   @override
   Widget build(BuildContext context) {
     if (propietario == null) {
-      return const Scaffold(
+      return BackHandler(
+        onBackPressed: () {
+          context.go('/acceso-general');
+        },
+        child: Scaffold(
         body: Center(child: CircularProgressIndicator()),
+        ),
       );
     }
 
-    return Scaffold(
+    return BackHandler(
+      onBackPressed: () {
+        context.go('/acceso-general');
+      },
+      child: Scaffold(
       appBar: AppBar(
         title: const Text('PROPIETARIO'),
       ),
@@ -828,6 +839,18 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
                       ));
                     },
                   ),
+                  _buildDrawerItem(
+                    icon: Icons.qr_code_2,
+                    title: 'Mis QR de Invitados',
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(context, MaterialPageRoute(
+                        builder: (_) => MisQrsInvitadosScreen(
+                          propietario: propietario!,
+                        ),
+                      ));
+                    },
+                  ),
                   const Divider(),
                   ListTile(
                     leading: Icon(Icons.help_center, color: Theme.of(context).colorScheme.primary),
@@ -879,8 +902,11 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
                 onTap: () async {
                   final navigator = context;
                   final prefs = await SharedPreferences.getInstance();
+                  // Limpiar TODOS los datos de sesión
                   await prefs.remove('propietario');
+                  await prefs.remove('userId');
                   if (!mounted) return;
+                  // Redirigir a acceso general
                   navigator.go('/acceso-general');
                 },
                 isDestructive: true,
@@ -1574,7 +1600,7 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
           );
         },
       ),
-
+      ),
     );
   }
 

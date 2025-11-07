@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/codigo_casa_util.dart';
+import '../../widgets/back_handler.dart';
 
 class IngresoCasaScreen extends StatefulWidget {
   final int casaNumero;
@@ -61,7 +62,8 @@ class _IngresoCasaScreenState extends State<IngresoCasaScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return BackHandler(
+      child: Scaffold(
       appBar: AppBar(title: Text('Código - Casa ${widget.casaNumero}')),
       body: Padding(
         padding: const EdgeInsets.all(24),
@@ -110,6 +112,7 @@ class _IngresoCasaScreenState extends State<IngresoCasaScreen> {
             ),
           ),
         ),
+      ),
       ),
     );
   }

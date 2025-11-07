@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../widgets/back_handler.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/propietario_model.dart';
 
@@ -31,7 +32,8 @@ class _GestionarSolicitudesScreenState extends State<GestionarSolicitudesScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return BackHandler(
+      child: Scaffold(
       appBar: AppBar(
         title: const Text('Gestionar Invitados'),
         leading: IconButton(
@@ -40,6 +42,18 @@ class _GestionarSolicitudesScreenState extends State<GestionarSolicitudesScreen>
         ),
         bottom: TabBar(
           controller: _tabController,
+          indicatorColor: Colors.white,
+          indicatorWeight: 3,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white.withOpacity(0.6),
+          labelStyle: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
+          ),
+          unselectedLabelStyle: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.normal,
+          ),
           tabs: const [
             Tab(text: 'Pendientes', icon: Icon(Icons.pending)),
             Tab(text: 'Aprobadas', icon: Icon(Icons.check_circle)),
@@ -54,6 +68,7 @@ class _GestionarSolicitudesScreenState extends State<GestionarSolicitudesScreen>
           _buildSolicitudesList('aceptada'),
           _buildSolicitudesList('rechazada'),
         ],
+      ),
       ),
     );
   }

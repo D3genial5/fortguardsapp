@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import '../../widgets/back_handler.dart';
 
 import '../../models/solicitud_model.dart';
 import '../../models/qr_local_model.dart';
@@ -172,7 +173,8 @@ class _MiQrScreenState extends State<MiQrScreen> {
   @override
   Widget build(BuildContext context) {
     if (_ci == null) {
-      return Scaffold(
+      return BackHandler(
+        child: Scaffold(
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -187,10 +189,12 @@ class _MiQrScreenState extends State<MiQrScreen> {
             ],
           ),
         ),
+        ),
       );
     }
 
-    return Scaffold(
+    return BackHandler(
+      child: Scaffold(
       appBar: AppBar(
         title: const Text('Mis accesos'),
         leading: IconButton(
@@ -214,6 +218,12 @@ class _MiQrScreenState extends State<MiQrScreen> {
                       itemBuilder: (context, index) {
                         final s = _solicitudes[index];
                         final fecha = DateFormat('dd/MM/yyyy – HH:mm').format(s.fecha);
+                        
+                        // Calcular duración estimada del QR (12 horas desde ahora)
+                        final expiraEstimado = DateTime.now().add(const Duration(hours: 12));
+                        final diferencia = expiraEstimado.difference(DateTime.now());
+                        final duracion = '${diferencia.inHours}h de duración';
+                        
                         return Card(
                           margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
                           child: Padding(
@@ -228,6 +238,25 @@ class _MiQrScreenState extends State<MiQrScreen> {
                                 const SizedBox(height: 8),
                                 Text('Estado: ${s.estado}'),
                                 Text('Fecha: $fecha'),
+                                if (s.estado == 'aceptada')
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 4),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.green.withOpacity(0.15),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Text(
+                                        'Duración del QR: $duracion',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.green,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
                                 if (s.estado == 'aceptada')
                                   Padding(
                                     padding: const EdgeInsets.only(top: 16.0),
@@ -270,6 +299,7 @@ class _MiQrScreenState extends State<MiQrScreen> {
             ),
           ],
         ),
+      ),
       ),
     );
   }

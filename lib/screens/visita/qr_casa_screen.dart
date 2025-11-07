@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/qr_local_model.dart';
 import '../../models/propietario_model.dart';
 import '../../services/qr_local_service.dart';
+import '../../widgets/back_handler.dart';
 
 class QrCasaScreen extends StatelessWidget {
   final String casa;
@@ -21,17 +22,18 @@ class QrCasaScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final qrData = 'CONDO:$condominio|CASA:$casa';
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('QR de la casa'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            context.pop();
-          },
+    return BackHandler(
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('QR de la casa'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              context.pop();
+            },
+          ),
         ),
-      ),
-      body: SafeArea(
+        body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
             final maxQrSize = (constraints.maxWidth - 64).clamp(200.0, 320.0);
@@ -69,6 +71,80 @@ class QrCasaScreen extends StatelessWidget {
                         'Condominio: $condominio',
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 24),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.blue.withOpacity(0.3),
+                            width: 1,
+                          ),
+                        ),
+                        child: Column(
+                          children: [
+                            const Text(
+                              'Información del QR',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                              children: [
+                                Column(
+                                  children: [
+                                    Icon(Icons.schedule, color: Colors.blue[700]),
+                                    const SizedBox(height: 4),
+                                    const Text(
+                                      'Duración',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                    const Text(
+                                      '12 horas',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                Container(
+                                  height: 40,
+                                  width: 1,
+                                  color: Colors.grey[300],
+                                ),
+                                Column(
+                                  children: [
+                                    Icon(Icons.repeat, color: Colors.blue[700]),
+                                    const SizedBox(height: 4),
+                                    const Text(
+                                      'Usos',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                    const Text(
+                                      '1 uso',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 20),
                       FilledButton.icon(
@@ -127,6 +203,7 @@ class QrCasaScreen extends StatelessWidget {
             );
           },
         ),
+      ),
       ),
     );
   }
