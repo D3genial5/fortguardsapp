@@ -5,6 +5,10 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+/// GlobalKey para acceder al Navigator desde servicios
+/// Debe asignarse en MaterialApp: navigatorKey: PushNotificationService.navigatorKey
+final GlobalKey<NavigatorState> globalNavigatorKey = GlobalKey<NavigatorState>();
+
 // Handler para mensajes en background (debe estar fuera de cualquier clase)
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -111,7 +115,6 @@ class PushNotificationService {
   
   // Inicializar servicio completo
   Future<void> initialize({
-    required BuildContext context,
     required String role,
     String? condominio,
     int? casaNumero,
@@ -123,7 +126,7 @@ class PushNotificationService {
     _qrCodigo = qrCodigo;
     
     // Configurar notificaciones locales
-    await _initializeLocalNotifications(context);
+    await _initializeLocalNotifications();
     
     // Solicitar permisos
     await _requestPermissions();
@@ -132,7 +135,7 @@ class PushNotificationService {
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
     
     // Configurar listeners para foreground
-    _setupForegroundListeners(context);
+    _setupForegroundListeners();
     
     // Suscribirse a topics según rol
     await _subscribeToTopics();
@@ -147,7 +150,7 @@ class PushNotificationService {
   }
   
   // Configurar notificaciones locales
-  Future<void> _initializeLocalNotifications(BuildContext context) async {
+  Future<void> _initializeLocalNotifications() async {
     const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
     const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
@@ -163,7 +166,7 @@ class PushNotificationService {
     await _localNotifications.initialize(
       initSettings,
       onDidReceiveNotificationResponse: (response) {
-        _handleNotificationTap(context, response.payload);
+        _handleNotificationTap(response.payload);
       },
     );
     
@@ -208,25 +211,28 @@ class PushNotificationService {
   }
   
   // Configurar listeners para mensajes en foreground
-  void _setupForegroundListeners(BuildContext context) {
+  void _setupForegroundListeners() {
     // Mensajes cuando la app está abierta
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       debugPrint('📨 Foreground message: ${message.messageId}');
-      _handleForegroundMessage(context, message);
+      _handleForegroundMessage(message);
     });
     
     // Cuando el usuario toca una notificación y la app se abre
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       debugPrint('📬 Message opened app: ${message.messageId}');
-      _handleMessageOpenedApp(context, message);
+      _handleMessageOpenedApp(message);
     });
     
     // Verificar si la app se abrió desde una notificación
-    _checkInitialMessage(context);
+    _checkInitialMessage();
   }
   
   // Manejar mensaje en foreground
-  void _handleForegroundMessage(BuildContext context, RemoteMessage message) {
+  void _handleForegroundMessage(RemoteMessage message) {
+    final context = globalNavigatorKey.currentContext;
+    if (context == null) return;
+    
     final data = message.data;
     final type = data['type'] ?? '';
     
@@ -234,7 +240,6 @@ class PushNotificationService {
     switch (type) {
       case 'visitorAccepted':
         _showInAppBanner(
-          context,
           '🏠 ${data['visitorName']} ha ingresado',
           'A las ${data['time']}',
           Colors.green,
@@ -242,7 +247,6 @@ class PushNotificationService {
         break;
       case 'qrExpired':
         _showInAppBanner(
-          context,
           '⏰ QR Expirado',
           'Tu código QR ha expirado',
           Colors.orange,
@@ -252,7 +256,6 @@ class PushNotificationService {
         final estado = data['estado'] ?? '';
         final color = estado == 'aceptada' ? Colors.green : Colors.red;
         _showInAppBanner(
-          context,
           estado == 'aceptada' ? '✅ Solicitud Aprobada' : '❌ Solicitud Rechazada',
           'Tu solicitud ha sido $estado',
           color,
@@ -267,7 +270,10 @@ class PushNotificationService {
   }
   
   // Mostrar banner in-app no intrusivo
-  void _showInAppBanner(BuildContext context, String title, String body, Color color) {
+  void _showInAppBanner(String title, String body, Color color) {
+    final context = globalNavigatorKey.currentContext;
+    if (context == null) return;
+    
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Column(
@@ -300,7 +306,7 @@ class PushNotificationService {
           textColor: Colors.white,
           onPressed: () {
             // Navegar según el tipo
-            _navigateFromNotification(context, title);
+            _navigateFromNotification(title);
           },
         ),
       ),
@@ -344,37 +350,40 @@ class PushNotificationService {
   }
   
   // Manejar cuando se abre la app desde notificación
-  void _handleMessageOpenedApp(BuildContext context, RemoteMessage message) {
+  void _handleMessageOpenedApp(RemoteMessage message) {
+    final navigator = globalNavigatorKey.currentState;
+    if (navigator == null) return;
+    
     final data = message.data;
     final type = data['type'] ?? '';
     
     switch (type) {
       case 'visitorAccepted':
-        // Navegar a logs de acceso
-        Navigator.pushNamed(context, '/logs-accesos');
+        navigator.pushNamed('/logs-accesos');
         break;
       case 'qrReady':
-        // Navegar a mis QRs
-        Navigator.pushNamed(context, '/mis-qrs-invitados');
+        navigator.pushNamed('/mis-qrs-invitados');
         break;
       case 'requestUpdate':
-        // Navegar a solicitudes
-        Navigator.pushNamed(context, '/gestionar-solicitudes');
+        navigator.pushNamed('/gestionar-solicitudes');
         break;
     }
   }
   
   // Verificar mensaje inicial
-  Future<void> _checkInitialMessage(BuildContext context) async {
+  Future<void> _checkInitialMessage() async {
     final initialMessage = await _fcm.getInitialMessage();
     if (initialMessage != null) {
-      _handleMessageOpenedApp(context, initialMessage);
+      _handleMessageOpenedApp(initialMessage);
     }
   }
   
   // Manejar tap en notificación local
-  void _handleNotificationTap(BuildContext context, String? payload) {
+  void _handleNotificationTap(String? payload) {
     if (payload == null) return;
+    
+    final navigator = globalNavigatorKey.currentState;
+    if (navigator == null) return;
     
     try {
       final data = jsonDecode(payload) as Map<String, dynamic>;
@@ -382,13 +391,13 @@ class PushNotificationService {
       
       switch (type) {
         case 'visitorAccepted':
-          Navigator.pushNamed(context, '/logs-accesos');
+          navigator.pushNamed('/logs-accesos');
           break;
         case 'qrReady':
-          Navigator.pushNamed(context, '/mis-qrs-invitados');
+          navigator.pushNamed('/mis-qrs-invitados');
           break;
         case 'requestUpdate':
-          Navigator.pushNamed(context, '/gestionar-solicitudes');
+          navigator.pushNamed('/gestionar-solicitudes');
           break;
       }
     } catch (e) {
@@ -397,13 +406,16 @@ class PushNotificationService {
   }
   
   // Navegar desde notificación
-  void _navigateFromNotification(BuildContext context, String title) {
+  void _navigateFromNotification(String title) {
+    final navigator = globalNavigatorKey.currentState;
+    if (navigator == null) return;
+    
     if (title.contains('Visita')) {
-      Navigator.pushNamed(context, '/logs-accesos');
+      navigator.pushNamed('/logs-accesos');
     } else if (title.contains('QR')) {
-      Navigator.pushNamed(context, '/mis-qrs-invitados');
+      navigator.pushNamed('/mis-qrs-invitados');
     } else if (title.contains('Solicitud')) {
-      Navigator.pushNamed(context, '/gestionar-solicitudes');
+      navigator.pushNamed('/gestionar-solicitudes');
     }
   }
   

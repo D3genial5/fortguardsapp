@@ -26,7 +26,7 @@ class AboutScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: scheme.surfaceContainerHighest.withOpacity(0.4),
+                color: scheme.surfaceContainerHighest.withValues(alpha: 0.4),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text('Versión 1.0.0', style: Theme.of(context).textTheme.bodyMedium),

@@ -132,7 +132,7 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
+                      color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.05),
                       blurRadius: 10,
                       offset: const Offset(0, 2),
                     ),
@@ -149,7 +149,7 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
                             width: 48,
                             height: 48,
                             decoration: BoxDecoration(
-                              color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Icon(
@@ -185,7 +185,7 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                             decoration: BoxDecoration(
-                              color: Colors.orange.withOpacity(0.1),
+                              color: Colors.orange.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: const Text(
@@ -203,7 +203,7 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey[50],
+                          color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey[50],
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Row(

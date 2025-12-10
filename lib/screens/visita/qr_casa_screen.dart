@@ -1,26 +1,174 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../models/qr_local_model.dart';
-import '../../models/propietario_model.dart';
-import '../../services/qr_local_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../widgets/back_handler.dart';
 
-class QrCasaScreen extends StatelessWidget {
+class QrCasaScreen extends StatefulWidget {
   final String casa;
   final String condominio;
+  // Datos opcionales pasados directamente (para evitar búsqueda en Firestore)
+  final String? docId;
+  final String? tipoAcceso;
+  final int? usosRestantes;
+  final String? codigoQr;
+  final String? fechaExpiracion;
 
   const QrCasaScreen({
     super.key,
     required this.casa,
     required this.condominio,
+    this.docId,
+    this.tipoAcceso,
+    this.usosRestantes,
+    this.codigoQr,
+    this.fechaExpiracion,
   });
 
   @override
+  State<QrCasaScreen> createState() => _QrCasaScreenState();
+}
+
+class _QrCasaScreenState extends State<QrCasaScreen> {
+  String? _codigoQr;
+  String? _tipoAcceso;
+  int? _usosRestantes;
+  DateTime? _fechaExpiracion;
+  bool _isLoading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarCodigoQr();
+  }
+
+  Future<void> _cargarCodigoQr() async {
+    try {
+      // Si se pasaron datos directamente, usarlos sin consultar Firestore
+      if (widget.docId != null || widget.codigoQr != null) {
+        String? tipoAcceso = widget.tipoAcceso;
+        int? usosRestantes = widget.usosRestantes;
+        
+        // Detectar acceso indefinido por usos altos
+        if (tipoAcceso == null && usosRestantes != null && usosRestantes >= 999999) {
+          tipoAcceso = 'indefinido';
+        }
+        
+        setState(() {
+          _codigoQr = widget.codigoQr;
+          _tipoAcceso = tipoAcceso;
+          _usosRestantes = usosRestantes;
+          if (widget.fechaExpiracion != null) {
+            _fechaExpiracion = DateTime.tryParse(widget.fechaExpiracion!);
+          }
+          _isLoading = false;
+        });
+        return;
+      }
+      
+      // Fallback: buscar en Firestore si no se pasaron datos
+      final prefs = await SharedPreferences.getInstance();
+      final ci = prefs.getString('visitante_ci');
+      
+      // Buscar la solicitud aprobada para este visitante, condominio y casa
+      final casaNumMatch = RegExp(r'(\d+)').firstMatch(widget.casa);
+      final casaNumero = casaNumMatch != null ? int.parse(casaNumMatch.group(1)!) : 0;
+
+      // Si tenemos CI, intentamos buscar solicitud aprobada
+      if (ci != null) {
+        final query = await FirebaseFirestore.instance
+            .collection('access_requests')
+            .where('ci', isEqualTo: ci)
+            .where('condominio', isEqualTo: widget.condominio)
+            .where('casaNumero', isEqualTo: casaNumero)
+            .where('estado', isEqualTo: 'aceptada')
+            .get();
+
+        if (query.docs.isNotEmpty) {
+          // Ordenar por fecha de aprobación (más reciente primero)
+          final docs = query.docs.toList();
+          docs.sort((a, b) {
+            final fechaA = a.data()['fechaAprobacion'];
+            final fechaB = b.data()['fechaAprobacion'];
+            if (fechaA == null && fechaB == null) return 0;
+            if (fechaA == null) return 1;
+            if (fechaB == null) return -1;
+            if (fechaA is Timestamp && fechaB is Timestamp) {
+              return fechaB.compareTo(fechaA);
+            }
+            return 0;
+          });
+          
+          // Usar la solicitud más reciente
+          final data = docs.first.data();
+          
+          // Obtener tipo de acceso (con fallback inteligente)
+          String? tipoAcceso = data['tipoAcceso'] as String?;
+          int? usosRestantes = data['usosRestantes'] as int?;
+          
+          // Si usosRestantes es muy alto (999999), probablemente es indefinido
+          if (tipoAcceso == null && usosRestantes != null && usosRestantes >= 999999) {
+            tipoAcceso = 'indefinido';
+          }
+          
+          setState(() {
+            _codigoQr = data['codigoQr'] as String?;
+            _tipoAcceso = tipoAcceso;
+            _usosRestantes = usosRestantes;
+            
+            final fechaExp = data['fechaExpiracion'];
+            if (fechaExp != null) {
+              if (fechaExp is Timestamp) {
+                _fechaExpiracion = fechaExp.toDate();
+              } else if (fechaExp is String) {
+                _fechaExpiracion = DateTime.tryParse(fechaExp);
+              }
+            }
+            
+            _isLoading = false;
+          });
+          return;
+        }
+      }
+      
+      // Sin solicitud aprobada - usar formato legacy (acceso por código de casa)
+      // Este es el flujo cuando el propietario le da el código directamente
+      setState(() {
+        _codigoQr = null; // Usará el formato CONDO:xxx|CASA:xxx
+        _tipoAcceso = 'codigo_casa';
+        _usosRestantes = null;
+        _isLoading = false;
+      });
+      
+    } catch (e) {
+      setState(() {
+        _error = 'Error al cargar el QR: $e';
+        _isLoading = false;
+      });
+    }
+  }
+
+  String _formatearFecha(DateTime fecha) {
+    final ahora = DateTime.now();
+    final diferencia = fecha.difference(ahora);
+    
+    if (diferencia.isNegative) {
+      return 'Expirado';
+    } else if (diferencia.inDays > 0) {
+      return '${diferencia.inDays}d ${diferencia.inHours % 24}h';
+    } else if (diferencia.inHours > 0) {
+      return '${diferencia.inHours}h ${diferencia.inMinutes % 60}m';
+    } else {
+      return '${diferencia.inMinutes}m';
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final qrData = 'CONDO:$condominio|CASA:$casa';
+    // El QR contiene el código único o fallback al formato viejo
+    final qrData = _codigoQr ?? 'CONDO:${widget.condominio}|CASA:${widget.casa}';
 
     return BackHandler(
       child: Scaffold(
@@ -34,7 +182,28 @@ class QrCasaScreen extends StatelessWidget {
           ),
         ),
         body: SafeArea(
-        child: LayoutBuilder(
+        child: _isLoading 
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+            ? Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
+                      const SizedBox(height: 16),
+                      Text(_error!, textAlign: TextAlign.center),
+                      const SizedBox(height: 24),
+                      FilledButton(
+                        onPressed: () => context.pop(),
+                        child: const Text('Volver'),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            : LayoutBuilder(
           builder: (context, constraints) {
             final maxQrSize = (constraints.maxWidth - 64).clamp(200.0, 320.0);
             return Center(
@@ -57,29 +226,47 @@ class QrCasaScreen extends StatelessWidget {
                             version: QrVersions.auto,
                             size: maxQrSize,
                             backgroundColor: Colors.white,
-                            foregroundColor: Colors.black,
+                            eyeStyle: const QrEyeStyle(
+                              eyeShape: QrEyeShape.square,
+                              color: Colors.black,
+                            ),
+                            dataModuleStyle: const QrDataModuleStyle(
+                              dataModuleShape: QrDataModuleShape.square,
+                              color: Colors.black,
+                            ),
                           ),
                         ),
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'Casa: $casa',
+                        'Casa: ${widget.casa}',
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
                       Text(
-                        'Condominio: $condominio',
+                        'Condominio: ${widget.condominio}',
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
+                      if (_codigoQr != null) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          'Código: $_codigoQr',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 24),
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: Colors.blue.withOpacity(0.1),
+                          color: Colors.blue.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: Colors.blue.withOpacity(0.3),
+                            color: Colors.blue.withValues(alpha: 0.3),
                             width: 1,
                           ),
                         ),
@@ -100,16 +287,22 @@ class QrCasaScreen extends StatelessWidget {
                                   children: [
                                     Icon(Icons.schedule, color: Colors.blue[700]),
                                     const SizedBox(height: 4),
-                                    const Text(
-                                      'Duración',
-                                      style: TextStyle(
+                                    Text(
+                                      _tipoAcceso == 'tiempo' ? 'Expira' : 'Tipo',
+                                      style: const TextStyle(
                                         fontSize: 12,
                                         color: Colors.grey,
                                       ),
                                     ),
-                                    const Text(
-                                      '12 horas',
-                                      style: TextStyle(
+                                    Text(
+                                      _tipoAcceso == 'tiempo' && _fechaExpiracion != null
+                                          ? _formatearFecha(_fechaExpiracion!)
+                                          : _tipoAcceso == 'indefinido' 
+                                              ? 'Indefinido'
+                                              : _tipoAcceso == 'codigo_casa'
+                                                  ? 'Código casa'
+                                                  : 'Por usos',
+                                      style: const TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.bold,
                                       ),
@@ -132,9 +325,11 @@ class QrCasaScreen extends StatelessWidget {
                                         color: Colors.grey,
                                       ),
                                     ),
-                                    const Text(
-                                      '1 uso',
-                                      style: TextStyle(
+                                    Text(
+                                      _tipoAcceso == 'indefinido' || _tipoAcceso == 'codigo_casa'
+                                          ? '∞'
+                                          : '${_usosRestantes ?? 0}',
+                                      style: const TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.bold,
                                       ),
@@ -147,54 +342,27 @@ class QrCasaScreen extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      FilledButton.icon(
-                        onPressed: () async {
-                          final messenger = ScaffoldMessenger.of(context);
-                          try {
-                            final codigo = qrData; // usamos el mismo payload del QR
-                            final casaNumMatch = RegExp(r'Casa (\d+)').firstMatch(casa);
-                            final casaNumero = casaNumMatch != null ? int.parse(casaNumMatch.group(1)!) : 0;
-
-                            // Obtener usuario actual (propietario o visitante)
-                            final prefs = await SharedPreferences.getInstance();
-                            String? userId;
-                            String? userName;
-                            
-                            // Verificar si es propietario
-                            final propietarioJson = prefs.getString('propietario');
-                            if (propietarioJson != null) {
-                              final propietario = PropietarioModel.fromJson(jsonDecode(propietarioJson));
-                              userId = '${propietario.condominio}_${propietario.casa.numero}';
-                              userName = propietario.personas.isNotEmpty ? propietario.personas.first : 'Propietario';
-                            } else {
-                              // Verificar si es visitante
-                              final visitanteNombre = prefs.getString('visitante_nombre');
-                              final visitanteCi = prefs.getString('visitante_ci');
-                              if (visitanteNombre != null && visitanteCi != null) {
-                                userId = 'visitante_$visitanteCi';
-                                userName = visitanteNombre;
-                              }
-                            }
-
-                            final qrModel = QrLocalModel(
-                              codigo: codigo,
-                              condominio: condominio,
-                              casa: casaNumero,
-                              expira: DateTime.now().add(const Duration(hours: 12)),
-                              usosRestantes: 1,
-                              propietarioId: userId,
-                              propietarioNombre: userName,
-                            );
-                            await QrLocalService.save(qrModel);
-                            if (!context.mounted) return;
-                            messenger.showSnackBar(const SnackBar(content: Text('QR guardado localmente')));
-                            context.push('/mis-qrs');
-                          } catch (e) {
-                            messenger.showSnackBar(const SnackBar(content: Text('Error al guardar QR')));
-                          }
-                        },
-                        icon: const Icon(Icons.download),
-                        label: const Text('Descargar QR'),
+                      // Mensaje informativo
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.check_circle, color: Colors.green, size: 20),
+                            SizedBox(width: 8),
+                            Text(
+                              'Muestra este QR al guardia',
+                              style: TextStyle(
+                                color: Colors.green,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),

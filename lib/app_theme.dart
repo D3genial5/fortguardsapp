@@ -4,12 +4,15 @@ import 'package:flutter/services.dart';
 class AppTheme {
   AppTheme._();
 
-  // Paleta compartida con admin
-  static const _brand = Color(0xFF141561);
-  static const _secondary = Color(0xFF18187A);
-  static const _tertiary = Color(0xFF5D67C6);
-  static const _pearlWhite = Color(0xFFFAFAF8);
-  static const _surfaceWhite = Color(0xFFFFFFFF);
+  // Paleta de colores - Tema Claro
+  static const _turquoise = Color(0xFF47D9B2);       // Color principal
+  static const _darkTurquoise = Color(0xFF35B092);   // Variante más oscura
+  static const _lightTurquoise = Color(0xFF5FE5C4);  // Variante más clara
+  static const _background = Color(0xFFF5F5F5);      // Fondo gris muy claro
+  static const _surface = Color(0xFFFFFFFF);         // Cards blancas
+  static const _textPrimary = Color(0xFF1A1A1A);     // Texto negro/gris oscuro
+  static const _textSecondary = Color(0xFF666666);   // Texto secundario gris
+  static const _dividerColor = Color(0xFFE0E0E0);    // Bordes y divisores
 
   static const _radius = 12.0;
 
@@ -17,40 +20,41 @@ class AppTheme {
     useMaterial3: true,
     colorScheme: const ColorScheme(
       brightness: Brightness.light,
-      primary: _brand,
+      primary: _turquoise,
       onPrimary: Colors.white,
-      primaryContainer: Color(0xFF1A1D5E),
-      onPrimaryContainer: Colors.white,
-      secondary: _secondary,
+      primaryContainer: _lightTurquoise,
+      onPrimaryContainer: _textPrimary,
+      secondary: _turquoise,
       onSecondary: Colors.white,
-      secondaryContainer: Color(0xFF2A2A8E),
-      onSecondaryContainer: Colors.white,
-      tertiary: _tertiary,
+      secondaryContainer: _lightTurquoise,
+      onSecondaryContainer: _textPrimary,
+      tertiary: _darkTurquoise,
       onTertiary: Colors.white,
-      tertiaryContainer: Color(0xFF7A83D4),
+      tertiaryContainer: _turquoise,
       onTertiaryContainer: Colors.white,
-      error: Color(0xFFBA1A1A),
+      error: Color(0xFFF44336),
       onError: Colors.white,
       errorContainer: Color(0xFFFFDAD6),
       onErrorContainer: Color(0xFF410002),
-      surface: _surfaceWhite,
-      onSurface: Color(0xFF1A1C1E),
-      surfaceContainerHighest: Color(0xFFF3F3F1),
-      onSurfaceVariant: Color(0xFF44474E),
-      outline: Color(0xFF75777F),
-      outlineVariant: Color(0xFFC5C6D0),
+      surface: _surface,
+      onSurface: _textPrimary,
+      surfaceContainerHighest: Color(0xFFFAFAFA),
+      onSurfaceVariant: _textSecondary,
+      outline: _dividerColor,
+      outlineVariant: Color(0xFFBDBDBD),
       shadow: Colors.black,
       scrim: Colors.black,
-      inverseSurface: Color(0xFF2F3036),
-      onInverseSurface: Color(0xFFF1F0F4),
-      inversePrimary: _tertiary,
-      surfaceTint: _brand,
+      inverseSurface: _textPrimary,
+      onInverseSurface: _surface,
+      inversePrimary: _turquoise,
+      surfaceTint: _turquoise,
     ),
-    scaffoldBackgroundColor: _pearlWhite,
+    scaffoldBackgroundColor: _background,
     appBarTheme: const AppBarTheme(
-      backgroundColor: _brand,
+      backgroundColor: _turquoise,
       foregroundColor: Colors.white,
       elevation: 0,
+      centerTitle: true,
       systemOverlayStyle: SystemUiOverlayStyle.light,
       iconTheme: IconThemeData(color: Colors.white),
       actionsIconTheme: IconThemeData(color: Colors.white),
@@ -59,58 +63,131 @@ class AppTheme {
     cardTheme: CardTheme(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       elevation: 2,
-      color: _surfaceWhite,
+      color: _surface,
+      shadowColor: Colors.black.withValues(alpha: 0.08),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: _brand,
+        backgroundColor: _turquoise,
         foregroundColor: Colors.white,
-        elevation: 4,
+        elevation: 2,
+        shadowColor: _turquoise.withValues(alpha: 0.3),
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(_radius)),
       ),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        backgroundColor: _brand,
+        backgroundColor: _turquoise,
         foregroundColor: Colors.white,
-        elevation: 3,
+        elevation: 2,
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(_radius)),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
-        foregroundColor: _brand,
-        backgroundColor: Colors.white,
-        side: const BorderSide(color: _brand, width: 1.5),
+        foregroundColor: _turquoise,
+        backgroundColor: Colors.transparent,
+        side: const BorderSide(color: _turquoise, width: 1.5),
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(_radius)),
       ),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: _surfaceWhite,
+      fillColor: _surface,
+      hintStyle: const TextStyle(color: _textSecondary),
+      labelStyle: const TextStyle(color: _textSecondary),
+      floatingLabelStyle: const TextStyle(color: _turquoise),
+      prefixIconColor: _textSecondary,
+      suffixIconColor: _textSecondary,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(_radius),
-        borderSide: const BorderSide(color: Color(0xFFE0E0E0), width: 1),
+        borderSide: const BorderSide(color: _dividerColor, width: 1),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(_radius),
-        borderSide: const BorderSide(color: Color(0xFFE0E0E0), width: 1),
+        borderSide: const BorderSide(color: _dividerColor, width: 1),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(_radius),
-        borderSide: const BorderSide(color: _brand, width: 2),
+        borderSide: const BorderSide(color: _turquoise, width: 2),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(_radius),
+        borderSide: const BorderSide(color: Color(0xFFF44336), width: 1),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(_radius),
+        borderSide: const BorderSide(color: Color(0xFFF44336), width: 2),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
     ),
     snackBarTheme: SnackBarThemeData(
-      backgroundColor: const Color(0xFF2F3036),
+      backgroundColor: _textPrimary,
       contentTextStyle: const TextStyle(color: Colors.white),
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    ),
+    iconTheme: const IconThemeData(
+      color: _textSecondary,
+    ),
+    floatingActionButtonTheme: FloatingActionButtonThemeData(
+      backgroundColor: _turquoise,
+      foregroundColor: Colors.white,
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    ),
+    checkboxTheme: CheckboxThemeData(
+      fillColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) return _turquoise;
+        return Colors.transparent;
+      }),
+      checkColor: WidgetStateProperty.all(Colors.white),
+      side: const BorderSide(color: _turquoise, width: 2),
+    ),
+    switchTheme: SwitchThemeData(
+      thumbColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) return _turquoise;
+        return const Color(0xFFBDBDBD);
+      }),
+      trackColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) return _turquoise.withValues(alpha: 0.3);
+        return const Color(0xFFE0E0E0);
+      }),
+    ),
+    listTileTheme: const ListTileThemeData(
+      iconColor: _turquoise,
+      textColor: _textPrimary,
+    ),
+    dialogTheme: DialogTheme(
+      backgroundColor: _surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      titleTextStyle: const TextStyle(color: _textPrimary, fontSize: 20, fontWeight: FontWeight.w600),
+      contentTextStyle: const TextStyle(color: _textPrimary, fontSize: 14),
+    ),
+    dividerTheme: const DividerThemeData(
+      color: _dividerColor,
+      thickness: 1,
+    ),
+    textTheme: const TextTheme(
+      displayLarge: TextStyle(color: _textPrimary, fontWeight: FontWeight.bold),
+      displayMedium: TextStyle(color: _textPrimary, fontWeight: FontWeight.bold),
+      displaySmall: TextStyle(color: _textPrimary, fontWeight: FontWeight.bold),
+      headlineLarge: TextStyle(color: _textPrimary, fontWeight: FontWeight.w600),
+      headlineMedium: TextStyle(color: _textPrimary, fontWeight: FontWeight.w600),
+      headlineSmall: TextStyle(color: _textPrimary, fontWeight: FontWeight.w600),
+      titleLarge: TextStyle(color: _textPrimary, fontWeight: FontWeight.w600),
+      titleMedium: TextStyle(color: _textPrimary, fontWeight: FontWeight.w500),
+      titleSmall: TextStyle(color: _textPrimary, fontWeight: FontWeight.w500),
+      bodyLarge: TextStyle(color: _textPrimary),
+      bodyMedium: TextStyle(color: _textPrimary),
+      bodySmall: TextStyle(color: _textSecondary),
+      labelLarge: TextStyle(color: _textPrimary, fontWeight: FontWeight.w500),
+      labelMedium: TextStyle(color: _textPrimary, fontWeight: FontWeight.w500),
+      labelSmall: TextStyle(color: _textSecondary),
     ),
   );
 

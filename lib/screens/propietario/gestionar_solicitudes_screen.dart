@@ -45,7 +45,7 @@ class _GestionarSolicitudesScreenState extends State<GestionarSolicitudesScreen>
           indicatorColor: Colors.white,
           indicatorWeight: 3,
           labelColor: Colors.white,
-          unselectedLabelColor: Colors.white.withOpacity(0.6),
+          unselectedLabelColor: Colors.white.withValues(alpha: 0.6),
           labelStyle: const TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.bold,
@@ -194,7 +194,7 @@ class _GestionarSolicitudesScreenState extends State<GestionarSolicitudesScreen>
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: _getStatusColor(estado).withOpacity(0.1),
+                            color: _getStatusColor(estado).withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
@@ -502,6 +502,17 @@ class _GestionarSolicitudesScreenState extends State<GestionarSolicitudesScreen>
     }
   }
 
+  /// Genera un código QR único de 8 caracteres
+  String _generarCodigoQr() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Sin I,O,0,1 para evitar confusión
+    final random = DateTime.now().millisecondsSinceEpoch;
+    final buffer = StringBuffer();
+    for (int i = 0; i < 8; i++) {
+      buffer.write(chars[(random + i * 7) % chars.length]);
+    }
+    return buffer.toString();
+  }
+
   Future<void> _aprobarSolicitud(String docId, Map<String, dynamic> data) async {
     try {
       final resultado = await showDialog<Map<String, dynamic>>(
@@ -510,11 +521,16 @@ class _GestionarSolicitudesScreenState extends State<GestionarSolicitudesScreen>
       );
       
       if (resultado != null) {
+        // Generar código QR único para esta solicitud
+        final codigoQr = _generarCodigoQr();
+        
         Map<String, dynamic> updateData = {
           'estado': 'aceptada',
           'fechaAprobacion': FieldValue.serverTimestamp(),
           'codigoUsos': resultado['usos'],
           'tipoAcceso': resultado['tipoAcceso'] ?? 'usos',
+          'codigoQr': codigoQr, // ← Código único para el QR
+          'usosRestantes': resultado['usos'], // ← Para decrementar después
         };
         
         // Agregar fecha de expiración si es por tiempo
@@ -644,7 +660,7 @@ class _GestionarSolicitudesScreenState extends State<GestionarSolicitudesScreen>
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.green.withOpacity(0.1),
+                        color: Colors.green.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Icon(
@@ -693,7 +709,7 @@ class _GestionarSolicitudesScreenState extends State<GestionarSolicitudesScreen>
                 Container(
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                    border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
                   ),
                   child: Column(
                     children: [
@@ -849,7 +865,7 @@ class _GestionarSolicitudesScreenState extends State<GestionarSolicitudesScreen>
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: isSelected ? Colors.green : Colors.grey.withOpacity(0.2),
+                  color: isSelected ? Colors.green : Colors.grey.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
@@ -900,7 +916,7 @@ class _GestionarSolicitudesScreenState extends State<GestionarSolicitudesScreen>
       Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.green.withOpacity(0.1),
+          color: Colors.green.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
@@ -944,7 +960,7 @@ class _GestionarSolicitudesScreenState extends State<GestionarSolicitudesScreen>
       Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.blue.withOpacity(0.1),
+          color: Colors.blue.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
@@ -989,7 +1005,7 @@ class _GestionarSolicitudesScreenState extends State<GestionarSolicitudesScreen>
                   flex: 1,
                   child: Container(
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.withOpacity(0.5)),
+                      border: Border.all(color: Colors.grey.withValues(alpha: 0.5)),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: DropdownButtonHideUnderline(
@@ -1029,7 +1045,7 @@ class _GestionarSolicitudesScreenState extends State<GestionarSolicitudesScreen>
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.1),
+                  color: Colors.blue.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
@@ -1053,7 +1069,7 @@ class _GestionarSolicitudesScreenState extends State<GestionarSolicitudesScreen>
       Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.purple.withOpacity(0.1),
+          color: Colors.purple.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
         ),
         child: const Row(

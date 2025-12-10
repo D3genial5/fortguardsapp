@@ -7,7 +7,7 @@ class ThemeManager {
   ThemeManager._();
   
   /// Notifier with current [ThemeMode]. Widgets can listen to rebuild on change.
-  static final ValueNotifier<ThemeMode> notifier = ValueNotifier(ThemeMode.system);
+  static final ValueNotifier<ThemeMode> notifier = ValueNotifier(ThemeMode.light);
 
   /// Toggle between light and dark modes. If current mode is system, assumes light first.
   static void toggle() {

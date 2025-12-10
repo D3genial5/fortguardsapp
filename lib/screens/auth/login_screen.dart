@@ -124,7 +124,7 @@ class _LoginScreenState extends State<LoginScreen> {
       
       // Inicializar notificaciones en segundo plano (no bloqueante)
       if (mounted) {
-        _notificationService.initialize(context, userId).then((_) {
+        _notificationService.initialize(userId).then((_) {
           _notificationService.subscribeToCondominio(condominioId);
         }).catchError((e) {
           debugPrint('Error inicializando notificaciones: $e');

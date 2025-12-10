@@ -107,20 +107,20 @@ class AccesoGeneralScreen extends StatelessWidget {
                   Positioned.fill(
                     child: Center(
                       child: Container(
-                        width: 90,
-                        height: 90,
+                        width: 110,
+                        height: 110,
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: Colors.black,
                           borderRadius: BorderRadius.circular(20),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.2),
+                              color: Colors.black.withValues(alpha: 0.2),
                               blurRadius: 24,
                               spreadRadius: 2,
                               offset: const Offset(0, 6),
                             ),
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.08),
+                              color: Colors.black.withValues(alpha: 0.08),
                               blurRadius: 8,
                               spreadRadius: 0,
                               offset: const Offset(0, 2),
@@ -130,7 +130,7 @@ class AccesoGeneralScreen extends StatelessWidget {
                         child: Padding(
                           padding: const EdgeInsets.all(14),
                           child: Image.asset(
-                            'logoFortguards.png',
+                            'Logos1.png',
                             fit: BoxFit.contain,
                           ),
                         ),
@@ -286,13 +286,13 @@ class _AnimatedGridButtonState extends State<_AnimatedGridButton>
             boxShadow: _isPressed
                 ? [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.15),
+                      color: Colors.black.withValues(alpha: 0.15),
                       blurRadius: 8,
                       spreadRadius: 0,
                       offset: const Offset(0, 3),
                     ),
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
+                      color: Colors.black.withValues(alpha: 0.05),
                       blurRadius: 4,
                       spreadRadius: -1,
                       offset: const Offset(0, 1),
@@ -300,19 +300,19 @@ class _AnimatedGridButtonState extends State<_AnimatedGridButton>
                   ]
                 : [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.25),
+                      color: Colors.black.withValues(alpha: 0.25),
                       blurRadius: 20,
                       spreadRadius: 0,
                       offset: const Offset(0, 8),
                     ),
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.12),
+                      color: Colors.black.withValues(alpha: 0.12),
                       blurRadius: 10,
                       spreadRadius: -2,
                       offset: const Offset(0, 4),
                     ),
                     BoxShadow(
-                      color: scheme.primary.withOpacity(0.25),
+                      color: scheme.primary.withValues(alpha: 0.25),
                       blurRadius: 14,
                       spreadRadius: -6,
                       offset: const Offset(0, 2),
@@ -326,15 +326,15 @@ class _AnimatedGridButtonState extends State<_AnimatedGridButton>
               children: [
                 Icon(
                   widget.icon,
-                  color: scheme.onPrimary,
-                  size: 44,
+                  color: Colors.black,
+                  size: 56,
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 16),
                 Text(
                   widget.label,
-                  style: TextStyle(
-                    color: scheme.onPrimary,
-                    fontSize: 13.5,
+                  style: const TextStyle(
+                    color: Colors.black,
+                    fontSize: 16,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 0.8,
                     height: 1.2,

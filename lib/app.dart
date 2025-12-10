@@ -48,10 +48,15 @@ final GoRouter _router = GoRouter(
     GoRoute(
       path: '/qr-casa',
       builder: (context, state) {
-        final data = state.extra as Map<String, String>;
+        final data = state.extra as Map<String, dynamic>;
         return QrCasaScreen(
-          casa: data['casa']!,
-          condominio: data['condominio']!,
+          casa: data['casa']?.toString() ?? '',
+          condominio: data['condominio']?.toString() ?? '',
+          docId: data['docId']?.toString(),
+          tipoAcceso: data['tipoAcceso']?.toString(),
+          usosRestantes: data['usosRestantes'] as int?,
+          codigoQr: data['codigoQr']?.toString(),
+          fechaExpiracion: data['fechaExpiracion']?.toString(),
         );
       },
     ),

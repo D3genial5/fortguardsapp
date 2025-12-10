@@ -3,6 +3,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'push_notification_service.dart' show globalNavigatorKey;
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -17,23 +18,23 @@ class NotificationService {
   String? _currentUserId;
   
   // Inicializar servicio de notificaciones
-  Future<void> initialize(BuildContext context, String userId) async {
+  Future<void> initialize(String userId) async {
     _currentUserId = userId;
+    
+    // Configurar listeners de FCM primero (síncrono)
+    _configureFCMListeners();
+    
+    // Escuchar cambios de token
+    _fcm.onTokenRefresh.listen(_saveToken);
     
     // Solicitar permisos
     await _requestPermissions();
     
     // Configurar notificaciones locales
-    await _configureLocalNotifications(context);
+    await _configureLocalNotifications();
     
     // Obtener y guardar token FCM
     await _getAndSaveToken();
-    
-    // Configurar listeners de FCM
-    _configureFCMListeners(context);
-    
-    // Escuchar cambios de token
-    _fcm.onTokenRefresh.listen(_saveToken);
   }
   
   // Solicitar permisos de notificaciones
@@ -49,7 +50,7 @@ class NotificationService {
   }
   
   // Configurar notificaciones locales
-  Future<void> _configureLocalNotifications(BuildContext context) async {
+  Future<void> _configureLocalNotifications() async {
     const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
     const iosSettings = DarwinInitializationSettings();
     
@@ -61,7 +62,7 @@ class NotificationService {
     await _localNotifications.initialize(
       initSettings,
       onDidReceiveNotificationResponse: (response) {
-        _handleNotificationTap(context, response.payload);
+        _handleNotificationTap(response.payload);
       },
     );
     
@@ -110,7 +111,7 @@ class NotificationService {
   }
   
   // Configurar listeners de FCM
-  void _configureFCMListeners(BuildContext context) {
+  void _configureFCMListeners() {
     // Mensaje en primer plano
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       _handleForegroundMessage(message);
@@ -118,11 +119,11 @@ class NotificationService {
     
     // App abierta desde notificación (background)
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      _handleNotificationOpen(context, message);
+      _handleNotificationOpen(message);
     });
     
     // Verificar si la app se abrió desde notificación (terminated)
-    _checkInitialMessage(context);
+    _checkInitialMessage();
   }
   
   // Manejar mensaje en primer plano
@@ -205,45 +206,48 @@ class NotificationService {
   }
   
   // Manejar apertura de notificación
-  void _handleNotificationOpen(BuildContext context, RemoteMessage message) {
+  void _handleNotificationOpen(RemoteMessage message) {
     final route = message.data['route'];
     if (route != null) {
-      _navigateToRoute(context, route);
+      _navigateToRoute(route);
     }
   }
   
   // Manejar tap en notificación local
-  void _handleNotificationTap(BuildContext context, String? payload) {
+  void _handleNotificationTap(String? payload) {
     if (payload != null && payload.isNotEmpty) {
-      _navigateToRoute(context, payload);
+      _navigateToRoute(payload);
     }
   }
   
   // Navegar a ruta específica
-  void _navigateToRoute(BuildContext context, String route) {
+  void _navigateToRoute(String route) {
+    final navigator = globalNavigatorKey.currentState;
+    if (navigator == null) return;
+    
     // Implementar navegación según la ruta
     switch (route) {
       case 'expensas':
-        Navigator.pushNamed(context, '/pago-expensas');
+        navigator.pushNamed('/pago-expensas');
         break;
       case 'reservas':
-        Navigator.pushNamed(context, '/reservas');
+        navigator.pushNamed('/reservas');
         break;
       case 'notificaciones':
-        Navigator.pushNamed(context, '/notificaciones');
+        navigator.pushNamed('/notificaciones');
         break;
       default:
         if (route.isNotEmpty) {
-          Navigator.pushNamed(context, route);
+          navigator.pushNamed(route);
         }
     }
   }
   
   // Verificar mensaje inicial (app terminated)
-  Future<void> _checkInitialMessage(BuildContext context) async {
+  Future<void> _checkInitialMessage() async {
     final initialMessage = await _fcm.getInitialMessage();
     if (initialMessage != null) {
-      _handleNotificationOpen(context, initialMessage);
+      _handleNotificationOpen(initialMessage);
     }
   }
   

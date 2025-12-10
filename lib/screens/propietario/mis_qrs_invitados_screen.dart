@@ -24,7 +24,7 @@ class _MisQrsInvitadosScreenState extends State<MisQrsInvitadosScreen> {
     return BackHandler(
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Mis QR de Invitados'),
+          title: const Text('Crear QRs'),
           actions: [
             IconButton(
               icon: const Icon(Icons.add_circle),

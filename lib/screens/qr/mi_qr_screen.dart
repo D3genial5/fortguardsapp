@@ -9,6 +9,7 @@ import '../../models/solicitud_model.dart';
 import '../../models/qr_local_model.dart';
 import '../../models/propietario_model.dart';
 import '../../services/qr_local_service.dart';
+import '../../services/migration_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class MiQrScreen extends StatefulWidget {
@@ -60,11 +61,38 @@ class _MiQrScreenState extends State<MiQrScreen> {
 
       final solicitudes = query.docs.map((d) {
         final data = d.data();
+        final docId = d.id; // Guardar el ID del documento
         final fechaTs = data['fecha'];
         final fecha = fechaTs is Timestamp ? fechaTs.toDate() : DateTime.now();
+        
+        // Obtener fecha de expiración si existe
+        DateTime? fechaExpiracion;
+        final fechaExp = data['fechaExpiracion'];
+        if (fechaExp != null) {
+          if (fechaExp is Timestamp) {
+            fechaExpiracion = fechaExp.toDate();
+          } else if (fechaExp is String) {
+            fechaExpiracion = DateTime.tryParse(fechaExp);
+          }
+        }
+        
+        // Obtener tipo de acceso y usos
+        String? tipoAcceso = data['tipoAcceso'] as String?;
+        int? usosRestantes = data['usosRestantes'] as int? ?? data['codigoUsos'] as int?;
+        
+        // Detectar acceso indefinido por usos altos (999999)
+        if (tipoAcceso == null && usosRestantes != null && usosRestantes >= 999999) {
+          tipoAcceso = 'indefinido';
+        }
+        
         return SolicitudModel.fromJson({
           ...data,
+          'docId': docId,
           'fecha': fecha.toIso8601String(),
+          'tipoAcceso': tipoAcceso ?? 'usos',
+          'usosRestantes': usosRestantes ?? 1,
+          'fechaExpiracion': fechaExpiracion?.toIso8601String(),
+          'codigoQr': data['codigoQr'],
         });
       }).toList();
 
@@ -154,8 +182,9 @@ class _MiQrScreenState extends State<MiQrScreen> {
         ),
       );
     } finally {
-      if (!mounted) return;
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -163,11 +192,73 @@ class _MiQrScreenState extends State<MiQrScreen> {
     context.push('/qr-casa', extra: {
       'casa': 'Casa ${solicitud.casaNumero}',
       'condominio': solicitud.condominio,
+      'docId': solicitud.docId, // ID específico de esta solicitud
+      'tipoAcceso': solicitud.tipoAcceso,
+      'usosRestantes': solicitud.usosRestantes,
+      'codigoQr': solicitud.codigoQr,
+      'fechaExpiracion': solicitud.fechaExpiracion?.toIso8601String(),
     });
   }
 
   void _irASolicitar() {
     context.push('/solicitud-acceso');
+  }
+
+  Future<void> _ejecutarMigracion() async {
+    final messenger = ScaffoldMessenger.of(context);
+    
+    // Mostrar diálogo de confirmación
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Migrar datos'),
+        content: const Text(
+          'Esto actualizará las solicitudes antiguas con los campos faltantes.\n\n'
+          '¿Deseas continuar?'
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Migrar'),
+          ),
+        ],
+      ),
+    );
+    
+    if (confirmar != true) return;
+    
+    // Mostrar loading
+    messenger.showSnackBar(
+      const SnackBar(content: Text('Migrando datos...')),
+    );
+    
+    // Ejecutar migración
+    final resultado = await MigrationService.migrarAccessRequests();
+    
+    if (!mounted) return;
+    
+    // Mostrar resultado
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          'Migración completada:\n'
+          '• Total: ${resultado['total']}\n'
+          '• Migrados: ${resultado['migrados']}\n'
+          '• Ya actualizados: ${resultado['yaActualizados']}\n'
+          '• Errores: ${resultado['errores']}'
+        ),
+        duration: const Duration(seconds: 5),
+        backgroundColor: resultado['errores'] == 0 ? Colors.green : Colors.orange,
+      ),
+    );
+    
+    // Recargar datos
+    _cargarDatosVisitante();
   }
 
   @override
@@ -203,6 +294,13 @@ class _MiQrScreenState extends State<MiQrScreen> {
             context.go('/acceso-general');
           },
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.sync),
+            tooltip: 'Migrar datos antiguos',
+            onPressed: _ejecutarMigracion,
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
@@ -219,10 +317,8 @@ class _MiQrScreenState extends State<MiQrScreen> {
                         final s = _solicitudes[index];
                         final fecha = DateFormat('dd/MM/yyyy – HH:mm').format(s.fecha);
                         
-                        // Calcular duración estimada del QR (12 horas desde ahora)
-                        final expiraEstimado = DateTime.now().add(const Duration(hours: 12));
-                        final diferencia = expiraEstimado.difference(DateTime.now());
-                        final duracion = '${diferencia.inHours}h de duración';
+                        // Usar la descripción real del tipo de acceso
+                        final duracion = s.descripcionAcceso;
                         
                         return Card(
                           margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
@@ -244,15 +340,19 @@ class _MiQrScreenState extends State<MiQrScreen> {
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                       decoration: BoxDecoration(
-                                        color: Colors.green.withOpacity(0.15),
+                                        color: s.tipoAcceso == 'indefinido' 
+                                            ? Colors.purple.withValues(alpha: 0.15)
+                                            : Colors.green.withValues(alpha: 0.15),
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                       child: Text(
-                                        'Duración del QR: $duracion',
-                                        style: const TextStyle(
+                                        duracion,
+                                        style: TextStyle(
                                           fontSize: 12,
                                           fontWeight: FontWeight.bold,
-                                          color: Colors.green,
+                                          color: s.tipoAcceso == 'indefinido' 
+                                              ? Colors.purple 
+                                              : Colors.green,
                                         ),
                                       ),
                                     ),

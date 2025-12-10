@@ -41,6 +41,7 @@ dependencies:
   firebase_core: ^2.31.0
   cloud_firestore: ^4.17.0
   firebase_messaging: ^14.7.11
+  firebase_storage: ^11.7.0
   # Notificaciones locales
   flutter_local_notifications: ^17.2.3
   timezone: ^0.9.4
@@ -81,6 +82,7 @@ flutter:
   assets:
     - logoFortguards.png
     - letrasFortguards2.png
+    - Logos1.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

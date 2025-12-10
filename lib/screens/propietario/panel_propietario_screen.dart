@@ -8,6 +8,7 @@ import '../../widgets/back_handler.dart';
 
 import '../../models/propietario_model.dart';
 import '../../core/codigo_casa_util.dart';
+import '../../services/alerta_service.dart';
 
 import 'package:fortguardsapp/screens/propietario/pago_expensas_screen.dart';
 import 'package:fortguardsapp/screens/propietario/gestionar_solicitudes_screen.dart';
@@ -142,7 +143,7 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
                   ),
                   child: Icon(
                     icono,
-                    color: Theme.of(context).colorScheme.onPrimary,
+                    color: Colors.black,
                     size: 30,
                   ),
                 ),
@@ -506,14 +507,14 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
     // Cancelar suscripción anterior si existe
     _codigoSubscription?.cancel();
     
-    // Crear nueva suscripción
+    // Crear nueva suscripción con actualización en tiempo real
     _codigoSubscription = FirebaseFirestore.instance
         .collection('condominios')
         .doc(condominioId)
         .collection('casas')
         .doc(casaNumero.toString())
         .snapshots()
-        .listen((snapshot) {
+        .listen((snapshot) async {
           if (!snapshot.exists || !mounted) return;
           
           final data = snapshot.data()!;
@@ -521,13 +522,35 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
           final expira = data['codigoExpira'] as Timestamp?;
           final usos = data['codigoUsos'] as int?;
           
+          // Siempre actualizar si hay un código válido
           if (nuevoCodigo != null && propietario != null) {
-            setState(() {
-              propietario = propietario!.copyWith(codigoCasa: nuevoCodigo);
-              if (expira != null) codigoExpira = expira.toDate();
-              if (usos != null) codigoUsos = usos;
-            });
+            // Verificar si el código realmente cambió
+            final codigoActual = propietario!.codigoCasa;
+            final codigoCambio = codigoActual != nuevoCodigo;
+            final usosCambiaron = codigoUsos != usos;
+            
+            if (codigoCambio || usosCambiaron) {
+              // Actualizar SharedPreferences para mantener sincronía
+              final prefs = await SharedPreferences.getInstance();
+              final identificador = '${propietario!.condominio}_${propietario!.casa.numero}';
+              await prefs.setString('codigo_$identificador', nuevoCodigo);
+              
+              // Actualizar modelo en memoria
+              final nuevoModelo = propietario!.copyWith(codigoCasa: nuevoCodigo);
+              final jsonString = jsonEncode(nuevoModelo.toJson());
+              await prefs.setString('propietario', jsonString);
+              
+              if (!mounted) return;
+              setState(() {
+                propietario = nuevoModelo;
+                if (expira != null) codigoExpira = expira.toDate();
+                if (usos != null) codigoUsos = usos;
+              });
+            }
           }
+        }, onError: (error) {
+          // Reconectar en caso de error
+          debugPrint('Error en listener de código: $error');
         });
   }
 
@@ -564,28 +587,88 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
     }
   }
 
-  void _mostrarAlertaSeleccionada(String opcion) {
-    // Mostrar mensaje de confirmación estilizado por 3 segundos exactos
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
+  Future<void> _mostrarAlertaSeleccionada(String opcion) async {
+    if (propietario == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error: No se encontraron datos del propietario')),
+      );
+      return;
+    }
+
+    // Mostrar diálogo de confirmación
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
           children: [
-            Icon(Icons.check_circle, color: Theme.of(context).colorScheme.onPrimary),
-            const SizedBox(width: 16),
-            Text(
-              'Alerta enviada correctamente',
-              style: TextStyle(color: Theme.of(context).colorScheme.onPrimary, fontWeight: FontWeight.bold),
-            ),
+            Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
+            const SizedBox(width: 12),
+            const Text('Confirmar Alerta'),
           ],
         ),
-        backgroundColor: Colors.green.shade800,
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(8),
-        elevation: 8,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        duration: const Duration(seconds: 3),
+        content: Text('¿Estás seguro de enviar una alerta de "$opcion"?\n\nEsto notificará al guardia de turno inmediatamente.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Enviar Alerta'),
+          ),
+        ],
       ),
     );
+
+    if (confirmar != true) return;
+
+    try {
+      // Enviar alerta a Firebase
+      await AlertaService.enviarAlerta(
+        tipo: AlertaService.tipoAlertaToFirebase(opcion),
+        casaNumero: propietario!.casa.numero,
+        condominio: propietario!.condominio,
+        propietarioId: '${propietario!.condominio}_${propietario!.casa.numero}',
+        propietarioNombre: propietario!.personas.isNotEmpty 
+            ? propietario!.personas.first 
+            : 'Propietario',
+      );
+
+      if (!mounted) return;
+
+      // Mostrar mensaje de éxito
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.check_circle, color: Theme.of(context).colorScheme.onPrimary),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  'Alerta enviada. El guardia será notificado.',
+                  style: TextStyle(color: Theme.of(context).colorScheme.onPrimary, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: Colors.green.shade800,
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(8),
+          elevation: 8,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al enviar alerta: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
   
   void _mostrarOpcionesAlertas() {
@@ -841,7 +924,7 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
                   ),
                   _buildDrawerItem(
                     icon: Icons.qr_code_2,
-                    title: 'Mis QR de Invitados',
+                    title: 'Crear QRs',
                     onTap: () {
                       Navigator.pop(context);
                       Navigator.push(context, MaterialPageRoute(
@@ -900,14 +983,15 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
                 icon: Icons.logout,
                 title: 'Cerrar sesión',
                 onTap: () async {
-                  final navigator = context;
+                  // Capturar router antes de operaciones async
+                  final router = GoRouter.of(context);
                   final prefs = await SharedPreferences.getInstance();
                   // Limpiar TODOS los datos de sesión
                   await prefs.remove('propietario');
                   await prefs.remove('userId');
                   if (!mounted) return;
                   // Redirigir a acceso general
-                  navigator.go('/acceso-general');
+                  router.go('/acceso-general');
                 },
                 isDestructive: true,
               ),
@@ -992,10 +1076,10 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
                                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                       child: Text(
                                         digit,
-                                        style: TextStyle(
+                                        style: const TextStyle(
                                           fontSize: 28,
                                           fontWeight: FontWeight.bold,
-                                          color: Theme.of(context).colorScheme.onPrimary,
+                                          color: Colors.black,
                                         ),
                                       ),
                                     ),
@@ -1065,12 +1149,13 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
                     SizedBox(
                       width: double.infinity,
                       child: FilledButton.icon(
-                        icon: const Icon(Icons.settings_rounded),
+                        icon: const Icon(Icons.settings_rounded, color: Colors.black),
                         label: const Text(
                           'Configurar Código',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
+                            color: Colors.black,
                           ),
                         ),
                         onPressed: () => _mostrarDialogoConfiguracion(),
@@ -1438,19 +1523,21 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
                                       onPressed: () async {
                                         // Confirmar eliminación
                                         final dialogContext = context;
+                                        // Capturar antes del await
+                                        final scaffoldMessenger = ScaffoldMessenger.of(dialogContext);
                                         final confirmar = await showDialog<bool>(
                                           context: dialogContext,
-                                          builder: (context) => AlertDialog(
+                                          builder: (ctx) => AlertDialog(
                                             title: const Text('Eliminar invitado'),
                                             content: Text('¿Estás seguro de eliminar a $nombre?\n\nEsta acción no se puede deshacer.'),
                                             actions: [
                                               TextButton(
-                                                onPressed: () => Navigator.pop(context, false),
+                                                onPressed: () => Navigator.pop(ctx, false),
                                                 child: const Text('Cancelar'),
                                               ),
                                               FilledButton(
                                                 style: FilledButton.styleFrom(backgroundColor: Colors.red),
-                                                onPressed: () => Navigator.pop(context, true),
+                                                onPressed: () => Navigator.pop(ctx, true),
                                                 child: const Text('Eliminar'),
                                               ),
                                             ],
@@ -1458,8 +1545,6 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
                                         );
                                         
                                         if (confirmar == true) {
-                                          // Eliminar el documento
-                                          final scaffoldMessenger = ScaffoldMessenger.of(dialogContext);
                                           try {
                                             await docs[index].reference.delete();
                                             if (!mounted) return;
@@ -1478,14 +1563,14 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
                                     IconButton(
                                       icon: const Icon(Icons.edit),
                                       onPressed: () async {
-                                        final editContext = context;
+                                        // Capturar antes del await
+                                        final scaffoldMessenger = ScaffoldMessenger.of(context);
                                         final resultado = await showDialog<Map<String, dynamic>>(
-                                          context: editContext,
-                                          builder: (context) => _buildModificarAccesoDialog(nombre, usos, data),
+                                          context: context,
+                                          builder: (ctx) => _buildModificarAccesoDialog(nombre, usos, data),
                                         );
                                         
                                         if (resultado != null) {
-                                          final scaffoldMessenger = ScaffoldMessenger.of(editContext);
                                           try {
                                             await docs[index].reference.update(resultado);
                                             if (!mounted) return;
@@ -1691,7 +1776,7 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
+                      color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
                     ),
                   ),
                   child: Column(
@@ -1705,7 +1790,7 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
                         tipoAcceso,
                         (valor) => setStateDialog(() => tipoAcceso = valor),
                       ),
-                      Divider(height: 1, color: Theme.of(context).colorScheme.outline.withOpacity(0.3)),
+                      Divider(height: 1, color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3)),
                       _buildTipoAccesoTile(
                         context,
                         'tiempo',
@@ -1715,7 +1800,7 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
                         tipoAcceso,
                         (valor) => setStateDialog(() => tipoAcceso = valor),
                       ),
-                      Divider(height: 1, color: Theme.of(context).colorScheme.outline.withOpacity(0.3)),
+                      Divider(height: 1, color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3)),
                       _buildTipoAccesoTile(
                         context,
                         'indefinido',
@@ -1908,7 +1993,7 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
       Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3),
+          color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
@@ -1952,7 +2037,7 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
       Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.secondaryContainer.withOpacity(0.3),
+          color: Theme.of(context).colorScheme.secondaryContainer.withValues(alpha: 0.3),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
@@ -1997,7 +2082,7 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
                   flex: 1,
                   child: Container(
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.withOpacity(0.5)),
+                      border: Border.all(color: Colors.grey.withValues(alpha: 0.5)),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: DropdownButtonHideUnderline(
@@ -2038,7 +2123,7 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.secondary.withOpacity(0.1),
+                  color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
@@ -2062,7 +2147,7 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
       Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.tertiaryContainer.withOpacity(0.3),
+          color: Theme.of(context).colorScheme.tertiaryContainer.withValues(alpha: 0.3),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
