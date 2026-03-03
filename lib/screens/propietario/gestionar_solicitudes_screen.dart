@@ -22,6 +22,51 @@ class _GestionarSolicitudesScreenState extends State<GestionarSolicitudesScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _limpiarSolicitudesAntiguas();
+  }
+
+  /// Elimina solicitudes rechazadas con más de 1 mes de antigüedad
+  Future<void> _limpiarSolicitudesAntiguas() async {
+    try {
+      final haceMes = DateTime.now().subtract(const Duration(days: 30));
+      
+      // Buscar solicitudes rechazadas antiguas para este propietario
+      final queryRechazadas = await FirebaseFirestore.instance
+          .collection('access_requests')
+          .where('condominio', isEqualTo: widget.propietario.condominio)
+          .where('casaNumero', isEqualTo: widget.propietario.casa.numero)
+          .where('estado', isEqualTo: 'rechazada')
+          .get();
+      
+      final batch = FirebaseFirestore.instance.batch();
+      int eliminados = 0;
+      
+      for (final doc in queryRechazadas.docs) {
+        final data = doc.data();
+        DateTime? fechaRechazo;
+        
+        // Obtener fecha de rechazo o fecha original
+        final fechaRech = data['fechaRechazo'] ?? data['fecha'];
+        if (fechaRech is Timestamp) {
+          fechaRechazo = fechaRech.toDate();
+        } else if (fechaRech is String) {
+          fechaRechazo = DateTime.tryParse(fechaRech);
+        }
+        
+        // Si tiene más de 1 mes, eliminar
+        if (fechaRechazo != null && fechaRechazo.isBefore(haceMes)) {
+          batch.delete(doc.reference);
+          eliminados++;
+        }
+      }
+      
+      if (eliminados > 0) {
+        await batch.commit();
+        debugPrint('✅ Eliminadas $eliminados solicitudes rechazadas antiguas');
+      }
+    } catch (e) {
+      debugPrint('Error limpiando solicitudes antiguas: $e');
+    }
   }
 
   @override
@@ -42,10 +87,10 @@ class _GestionarSolicitudesScreenState extends State<GestionarSolicitudesScreen>
         ),
         bottom: TabBar(
           controller: _tabController,
-          indicatorColor: Colors.white,
+          indicatorColor: Theme.of(context).colorScheme.primary,
           indicatorWeight: 3,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white.withValues(alpha: 0.6),
+          labelColor: Theme.of(context).colorScheme.primary,
+          unselectedLabelColor: const Color(0xFF6E6E73),
           labelStyle: const TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.bold,
@@ -129,12 +174,15 @@ class _GestionarSolicitudesScreenState extends State<GestionarSolicitudesScreen>
                 Icon(
                   _getEmptyIcon(estado),
                   size: 64,
-                  color: Colors.grey,
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                 ),
                 const SizedBox(height: 16),
                 Text(
                   _getEmptyMessage(estado),
-                  style: const TextStyle(fontSize: 16, color: Colors.grey),
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                  ),
                 ),
               ],
             ),
@@ -149,7 +197,23 @@ class _GestionarSolicitudesScreenState extends State<GestionarSolicitudesScreen>
             
             return Card(
               margin: const EdgeInsets.only(bottom: 12),
-              child: Padding(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.06),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -181,7 +245,7 @@ class _GestionarSolicitudesScreenState extends State<GestionarSolicitudesScreen>
                               Text(
                                 'CI: ${data['ci'] ?? 'Sin CI'}',
                                 style: TextStyle(
-                                  color: Colors.grey[600],
+                                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                                   fontSize: 14,
                                 ),
                               ),
@@ -211,12 +275,12 @@ class _GestionarSolicitudesScreenState extends State<GestionarSolicitudesScreen>
                     const SizedBox(height: 12),
                     Row(
                       children: [
-                        Icon(Icons.access_time, size: 16, color: Colors.grey[600]),
+                        Icon(Icons.access_time, size: 16, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
                         const SizedBox(width: 4),
                         Text(
                           _formatFecha(data['fecha']),
                           style: TextStyle(
-                            color: Colors.grey[600],
+                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                             fontSize: 12,
                           ),
                         ),
@@ -256,6 +320,7 @@ class _GestionarSolicitudesScreenState extends State<GestionarSolicitudesScreen>
                     ],
                   ],
                 ),
+              ),
               ),
             );
           },
@@ -305,7 +370,7 @@ class _GestionarSolicitudesScreenState extends State<GestionarSolicitudesScreen>
 
   List<Widget> _buildInfoAcceso(Map<String, dynamic> data) {
     final tipoAcceso = data['tipoAcceso'] ?? 'usos';
-    final usos = data['codigoUsos'] ?? 1;
+    final usos = data['usosRestantes'] ?? data['codigoUsos'] ?? 1;
     
     List<Widget> widgets = [];
     

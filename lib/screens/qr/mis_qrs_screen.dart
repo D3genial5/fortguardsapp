@@ -160,6 +160,9 @@ class _MisQrsScreenState extends State<MisQrsScreen> {
                               ? DateFormat('dd/MM/yyyy – HH:mm').format(fechaExpiracion)
                               : 'Sin expiración';
                           
+                          final codigoQr = data['codigoQr'] as String?;
+                          final docId = qrs[index].id;
+                          
                           return Card(
                             elevation: 2,
                             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -170,6 +173,11 @@ class _MisQrsScreenState extends State<MisQrsScreen> {
                                 context.push('/qr-casa', extra: {
                                   'casa': 'Casa $casaNumero',
                                   'condominio': condominio,
+                                  'docId': docId,
+                                  'tipoAcceso': tipoAcceso,
+                                  'usosRestantes': usosRestantes,
+                                  'codigoQr': codigoQr,
+                                  'fechaExpiracion': fechaExpiracion?.toIso8601String(),
                                 });
                               },
                               child: Padding(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:gal/gal.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/propietario_model.dart';
 import '../../models/qr_invitado_model.dart';
 import '../../services/qr_service.dart';
@@ -20,18 +21,49 @@ class MisQrsInvitadosScreen extends StatefulWidget {
 
 class _MisQrsInvitadosScreenState extends State<MisQrsInvitadosScreen> {
   @override
+  void initState() {
+    super.initState();
+    _limpiarQrsRevocadosAntiguos();
+  }
+
+  /// Elimina QRs revocados con más de 1 mes de antigüedad
+  Future<void> _limpiarQrsRevocadosAntiguos() async {
+    try {
+      final haceMes = DateTime.now().subtract(const Duration(days: 30));
+      
+      // Buscar QRs revocados antiguos para este propietario
+      final queryRevocados = await QrService.obtenerQrsPorPropietario(
+        condominio: widget.propietario.condominio,
+        casaNumero: widget.propietario.casa.numero,
+      ).first;
+      
+      int eliminados = 0;
+      
+      for (final qr in queryRevocados) {
+        if (qr.estado == EstadoQr.revocado && qr.creadoEn.isBefore(haceMes)) {
+          // Eliminar QR revocado antiguo
+          await FirebaseFirestore.instance
+              .collection('qr_invitados')
+              .doc(qr.codigo)
+              .delete();
+          eliminados++;
+        }
+      }
+      
+      if (eliminados > 0) {
+        debugPrint('✅ Eliminados $eliminados QRs revocados antiguos');
+      }
+    } catch (e) {
+      debugPrint('Error limpiando QRs revocados: $e');
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return BackHandler(
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Crear QRs'),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.add_circle),
-              onPressed: _mostrarDialogoCrearQr,
-              tooltip: 'Crear nuevo QR',
-            ),
-          ],
+          title: const Text('QRs de invitados'),
         ),
         body: StreamBuilder<List<QrInvitadoModel>>(
           stream: QrService.obtenerQrsPorPropietario(
@@ -66,11 +98,12 @@ class _MisQrsInvitadosScreenState extends State<MisQrsInvitadosScreen> {
                     Icon(Icons.qr_code_2, size: 80, color: Colors.grey[400]),
                     const SizedBox(height: 16),
                     const Text('No tienes QR de invitados', style: TextStyle(fontSize: 18)),
-                    const SizedBox(height: 24),
-                    FilledButton.icon(
-                      onPressed: _mostrarDialogoCrearQr,
-                      icon: const Icon(Icons.add),
-                      label: const Text('Crear QR'),
+                    const SizedBox(height: 8),
+                    Text(
+                      'La creación de QRs está desactivada.',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                      ),
                     ),
                   ],
                 ),
@@ -161,23 +194,6 @@ class _MisQrsInvitadosScreenState extends State<MisQrsInvitadosScreen> {
       case TipoQr.porTiempo: return Icons.schedule;
       case TipoQr.porUso: return Icons.repeat;
       case TipoQr.mixto: return Icons.compare_arrows;
-    }
-  }
-
-  Future<void> _mostrarDialogoCrearQr() async {
-    final resultado = await showDialog<bool>(
-      context: context,
-      builder: (context) => DialogoCrearQr(
-        condominio: widget.propietario.condominio,
-        casaNumero: widget.propietario.casa.numero,
-        propietarioId: widget.propietario.codigoCasa,
-      ),
-    );
-
-    if (resultado == true && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('✅ QR creado exitosamente'), backgroundColor: Colors.green),
-      );
     }
   }
 

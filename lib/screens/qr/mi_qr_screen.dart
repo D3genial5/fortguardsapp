@@ -31,6 +31,20 @@ class _MiQrScreenState extends State<MiQrScreen> {
     _cargarDatosVisitante();
   }
 
+  bool _esSolicitudQrInvalida(SolicitudModel solicitud) {
+    if (solicitud.estado != 'aceptada') return false;
+
+    final tipo = solicitud.tipoAcceso ?? 'usos';
+    final sinUsos = tipo != 'indefinido' &&
+        solicitud.usosRestantes != null &&
+        solicitud.usosRestantes! <= 0;
+    final expiradoPorTiempo = tipo == 'tiempo' &&
+        solicitud.fechaExpiracion != null &&
+        DateTime.now().isAfter(solicitud.fechaExpiracion!);
+
+    return sinUsos || expiradoPorTiempo;
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -306,19 +320,53 @@ class _MiQrScreenState extends State<MiQrScreen> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            Text('Visitante: $_nombre\nCI: $_ci', textAlign: TextAlign.center),
+            Text(
+              'Visitante: $_nombre\nCI: $_ci',
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
             const SizedBox(height: 24),
             Expanded(
               child: _solicitudes.isEmpty
-                  ? const Center(child: Text('No tienes solicitudes registradas'))
+                  ? Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.assignment_late_outlined,
+                            size: 64,
+                            color: Theme.of(context).colorScheme.outline,
+                          ),
+                          const SizedBox(height: 14),
+                          Text(
+                            'No tienes solicitudes registradas',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Solicita un acceso para generar tu QR de ingreso.',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                                ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    )
                   : ListView.builder(
                       itemCount: _solicitudes.length,
                       itemBuilder: (context, index) {
                         final s = _solicitudes[index];
                         final fecha = DateFormat('dd/MM/yyyy – HH:mm').format(s.fecha);
+                        final qrInvalido = _esSolicitudQrInvalida(s);
                         
                         // Usar la descripción real del tipo de acceso
-                        final duracion = s.descripcionAcceso;
+                        final duracion = qrInvalido ? 'QR inválido' : s.descripcionAcceso;
                         
                         return Card(
                           margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
@@ -330,19 +378,23 @@ class _MiQrScreenState extends State<MiQrScreen> {
                                 Text(
                                   '${s.condominio} - Casa ${s.casaNumero}',
                                   style: Theme.of(context).textTheme.titleMedium,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                                 const SizedBox(height: 8),
-                                Text('Estado: ${s.estado}'),
-                                Text('Fecha: $fecha'),
+                                Text('Estado: ${s.estado}', maxLines: 1, overflow: TextOverflow.ellipsis),
+                                Text('Fecha: $fecha', maxLines: 1, overflow: TextOverflow.ellipsis),
                                 if (s.estado == 'aceptada')
                                   Padding(
                                     padding: const EdgeInsets.only(top: 4),
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                       decoration: BoxDecoration(
-                                        color: s.tipoAcceso == 'indefinido' 
-                                            ? Colors.purple.withValues(alpha: 0.15)
-                                            : Colors.green.withValues(alpha: 0.15),
+                                        color: qrInvalido
+                                            ? Colors.red.withValues(alpha: 0.12)
+                                            : s.tipoAcceso == 'indefinido' 
+                                                ? Colors.purple.withValues(alpha: 0.15)
+                                                : Colors.green.withValues(alpha: 0.15),
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                       child: Text(
@@ -350,9 +402,11 @@ class _MiQrScreenState extends State<MiQrScreen> {
                                         style: TextStyle(
                                           fontSize: 12,
                                           fontWeight: FontWeight.bold,
-                                          color: s.tipoAcceso == 'indefinido' 
-                                              ? Colors.purple 
-                                              : Colors.green,
+                                          color: qrInvalido
+                                              ? Colors.red
+                                              : s.tipoAcceso == 'indefinido' 
+                                                  ? Colors.purple 
+                                                  : Colors.green,
                                         ),
                                       ),
                                     ),
@@ -360,28 +414,59 @@ class _MiQrScreenState extends State<MiQrScreen> {
                                 if (s.estado == 'aceptada')
                                   Padding(
                                     padding: const EdgeInsets.only(top: 16.0),
-                                    child: Row(
-                                      children: [
-                                        Expanded(
-                                          child: FilledButton.icon(
-                                            icon: const Icon(Icons.qr_code),
-                                            onPressed: _isLoading ? null : () => _verQr(s),
-                                            label: const Text('Ver QR'),
+                                    child: LayoutBuilder(
+                                      builder: (context, constraints) {
+                                        final usarColumna = constraints.maxWidth < 360;
+
+                                        final botonVerQr = FilledButton.icon(
+                                          icon: const Icon(Icons.qr_code),
+                                          onPressed: (_isLoading || qrInvalido) ? null : () => _verQr(s),
+                                          label: const Text(
+                                            'Ver QR',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            softWrap: false,
                                           ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: FilledButton.icon(
-                                            icon: _isLoading ? SizedBox(
-                                              height: 20,
-                                              width: 20,
-                                              child: CircularProgressIndicator(color: Theme.of(context).colorScheme.onPrimary, strokeWidth: 2),
-                                            ) : const Icon(Icons.download),
-                                            onPressed: _isLoading ? null : () => _descargarQr(s),
-                                            label: Text(_isLoading ? 'Guardando' : 'Descargar'),
+                                        );
+
+                                        final botonDescargar = FilledButton.icon(
+                                          icon: _isLoading
+                                              ? SizedBox(
+                                                  height: 20,
+                                                  width: 20,
+                                                  child: CircularProgressIndicator(
+                                                    color: Theme.of(context).colorScheme.onPrimary,
+                                                    strokeWidth: 2,
+                                                  ),
+                                                )
+                                              : const Icon(Icons.download),
+                                          onPressed: (_isLoading || qrInvalido) ? null : () => _descargarQr(s),
+                                          label: Text(
+                                            _isLoading ? 'Guardando' : 'Descargar',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            softWrap: false,
                                           ),
-                                        ),
-                                      ],
+                                        );
+
+                                        if (usarColumna) {
+                                          return Column(
+                                            children: [
+                                              SizedBox(width: double.infinity, child: botonVerQr),
+                                              const SizedBox(height: 8),
+                                              SizedBox(width: double.infinity, child: botonDescargar),
+                                            ],
+                                          );
+                                        }
+
+                                        return Row(
+                                          children: [
+                                            Expanded(child: botonVerQr),
+                                            const SizedBox(width: 8),
+                                            Expanded(child: botonDescargar),
+                                          ],
+                                        );
+                                      },
                                     ),
                                   ),
                               ],
@@ -392,10 +477,21 @@ class _MiQrScreenState extends State<MiQrScreen> {
                     ),
             ),
             const SizedBox(height: 16),
-            FilledButton.icon(
-              onPressed: _irASolicitar,
-              icon: const Icon(Icons.add),
-              label: const Text('Solicitar acceso'),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFFFF4200),
+                  foregroundColor: Colors.black,
+                  minimumSize: const Size.fromHeight(52),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                onPressed: _irASolicitar,
+                icon: const Icon(Icons.add),
+                label: const Text('Solicitar acceso'),
+              ),
             ),
           ],
         ),

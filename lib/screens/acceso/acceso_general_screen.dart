@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../theme_manager.dart';
 import '../../widgets/back_handler.dart';
 
 class AccesoGeneralScreen extends StatelessWidget {
@@ -14,7 +13,7 @@ class AccesoGeneralScreen extends StatelessWidget {
       appBar: AppBar(
         centerTitle: true,
         title: Image.asset(
-          'letrasFortguards2.png',
+          'assets/FORTGUARDletras.png',
           height: 28,
           fit: BoxFit.contain,
         ),
@@ -33,8 +32,10 @@ class AccesoGeneralScreen extends StatelessWidget {
           // Calcular tamaño óptimo de botones
           final horizontalPadding = 32.0;
           final buttonGap = 16.0;
-          final buttonWidth = (screenWidth - (horizontalPadding * 2) - buttonGap) / 2;
-          final buttonHeight = buttonWidth * 1.35; // Ratio rectangular vertical óptimo
+          final rawButtonWidth = (screenWidth - (horizontalPadding * 2) - buttonGap) / 2;
+          final buttonWidth = rawButtonWidth.clamp(120.0, 180.0);
+          final buttonHeight = (buttonWidth * 1.35).clamp(162.0, 240.0);
+          final logoSize = (screenWidth * 0.42).clamp(120.0, 162.0);
           
           // Calcular altura total necesaria
           final totalHeight = (buttonHeight * 2) + buttonGap;
@@ -103,35 +104,28 @@ class AccesoGeneralScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-                  // Logo central
+                  // Logo central FortGuard
                   Positioned.fill(
                     child: Center(
                       child: Container(
-                        width: 110,
-                        height: 110,
+                        width: logoSize,
+                        height: logoSize,
                         decoration: BoxDecoration(
-                          color: Colors.black,
                           borderRadius: BorderRadius.circular(20),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.2),
+                              color: Colors.black.withValues(alpha: 0.3),
                               blurRadius: 24,
                               spreadRadius: 2,
                               offset: const Offset(0, 6),
                             ),
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.08),
-                              blurRadius: 8,
-                              spreadRadius: 0,
-                              offset: const Offset(0, 2),
-                            ),
                           ],
                         ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(14),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(20),
                           child: Image.asset(
-                            'Logos1.png',
-                            fit: BoxFit.contain,
+                            'assets/FORTGUARD-ISO1.png',
+                            fit: BoxFit.cover,
                           ),
                         ),
                       ),
@@ -185,13 +179,6 @@ class AccesoGeneralScreen extends StatelessWidget {
               leading: Icon(Icons.description_outlined, color: scheme.primary),
               title: const Text('Términos y condiciones'),
               onTap: () => context.push('/terms'),
-            ),
-            const Divider(),
-            SwitchListTile(
-              secondary: Icon(Icons.brightness_6, color: scheme.primary),
-              title: const Text('Tema oscuro'),
-              value: ThemeManager.notifier.value == ThemeMode.dark,
-              onChanged: (_) => ThemeManager.toggle(),
             ),
           ],
         ),

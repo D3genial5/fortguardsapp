@@ -20,6 +20,9 @@ class _SolicitudQrScreenState extends State<SolicitudQrScreen> {
   final _nombreApellidosController = TextEditingController();
   final _ciController = TextEditingController();
 
+  bool _nombreBloqueado = false;
+  bool _ciBloqueado = false;
+
 
   String? _condominioSeleccionado;
   int? _casaSeleccionada;
@@ -33,8 +36,12 @@ class _SolicitudQrScreenState extends State<SolicitudQrScreen> {
   
   Future<void> _cargarDatosVisitante() async {
     final prefs = await SharedPreferences.getInstance();
-    _nombreApellidosController.text = prefs.getString('visitante_nombre') ?? '';
-    _ciController.text = prefs.getString('visitante_ci') ?? '';
+    final nombre = prefs.getString('visitante_nombre') ?? '';
+    final ci = prefs.getString('visitante_ci') ?? '';
+    _nombreApellidosController.text = nombre;
+    _ciController.text = ci;
+    _nombreBloqueado = nombre.isNotEmpty;
+    _ciBloqueado = ci.isNotEmpty;
     setState(() {});
   }
 
@@ -171,12 +178,24 @@ class _SolicitudQrScreenState extends State<SolicitudQrScreen> {
             const SizedBox(height: 16),
             TextField(
               controller: _nombreApellidosController,
-              decoration: const InputDecoration(labelText: 'Nombre y Apellidos'),
+              readOnly: _nombreBloqueado,
+              decoration: InputDecoration(
+                labelText: 'Nombre y Apellidos',
+                suffixIcon: _nombreBloqueado
+                    ? const Icon(Icons.lock_rounded, size: 18)
+                    : null,
+              ),
             ),
             const SizedBox(height: 16),
             TextField(
               controller: _ciController,
-              decoration: const InputDecoration(labelText: 'Carnet de identidad'),
+              readOnly: _ciBloqueado,
+              decoration: InputDecoration(
+                labelText: 'Carnet de identidad',
+                suffixIcon: _ciBloqueado
+                    ? const Icon(Icons.lock_rounded, size: 18)
+                    : null,
+              ),
               keyboardType: TextInputType.number,
             ),
             const SizedBox(height: 32),

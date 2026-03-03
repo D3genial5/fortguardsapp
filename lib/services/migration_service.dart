@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
 /// Servicio para migrar datos viejos de access_requests
 /// Agrega campos faltantes: tipoAcceso, usosRestantes, codigoQr, fechaAprobacion
@@ -97,12 +98,12 @@ class MigrationService {
           
         } catch (e) {
           errores++;
-          print('Error migrando doc ${doc.id}: $e');
+          debugPrint('Error migrando doc ${doc.id}: $e');
         }
       }
       
     } catch (e) {
-      print('Error en migración: $e');
+      debugPrint('Error en migración: $e');
     }
     
     return {
@@ -138,15 +139,15 @@ class MigrationService {
           completos++;
         } else {
           incompletos++;
-          print('Doc incompleto: ${doc.id}');
-          print('  tipoAcceso: ${data['tipoAcceso']}');
-          print('  usosRestantes: ${data['usosRestantes']}');
-          print('  codigoQr: ${data['codigoQr']}');
+          debugPrint('Doc incompleto: ${doc.id}');
+          debugPrint('  tipoAcceso: ${data['tipoAcceso']}');
+          debugPrint('  usosRestantes: ${data['usosRestantes']}');
+          debugPrint('  codigoQr: ${data['codigoQr']}');
         }
       }
       
     } catch (e) {
-      print('Error verificando: $e');
+      debugPrint('Error verificando: $e');
     }
     
     return {

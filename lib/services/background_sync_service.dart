@@ -29,6 +29,6 @@ class BackgroundSyncService {
   /// Cancelar todas las tareas (actualmente deshabilitado)
   Future<void> cancelAllTasks() async {
     debugPrint('⚠️  Cancel tasks disabled - waiting for workmanager update');
-    // TODO: Re-enable when workmanager is updated to compatible version
+    // 
   }
 }

@@ -23,7 +23,26 @@ class _PagoExpensasScreenState extends State<PagoExpensasScreen> {
   double? _montoExpensa;
   DateTime? _fechaVencimiento;
   String? _qrPagoUrl;
+  int _mesesAdelantados = 0;
   final List<Map<String, dynamic>> _historialPagos = [];
+  
+  // Verificar si está próximo a vencer (3 días antes)
+  bool get _proximoAVencer {
+    if (_fechaVencimiento == null) return false;
+    final diasRestantes = _fechaVencimiento!.difference(DateTime.now()).inDays;
+    return diasRestantes <= 3 && diasRestantes >= 0 && _estadoExpensa != 'Pagado';
+  }
+  
+  // Verificar si ya venció
+  bool get _vencido {
+    if (_fechaVencimiento == null) return false;
+    return _fechaVencimiento!.isBefore(DateTime.now()) && _estadoExpensa != 'Pagado';
+  }
+  
+  int get _diasParaVencimiento {
+    if (_fechaVencimiento == null) return 0;
+    return _fechaVencimiento!.difference(DateTime.now()).inDays;
+  }
 
   @override
   void initState() {
@@ -47,10 +66,17 @@ class _PagoExpensasScreenState extends State<PagoExpensasScreen> {
 
       if (docCasa.exists) {
         final data = docCasa.data()!;
+        // Normalizar estado de expensa (compatibilidad con admin)
+        String? estado = data['estadoExpensa']?.toString();
+        if (estado == 'pagada') estado = 'Pagado';
+        if (estado == 'pendiente') estado = 'Pendiente';
+        
         setState(() {
-          _estadoExpensa = data['estadoExpensa']?.toString();
-          _montoExpensa = (data['montoExpensa'] as num?)?.toDouble();
+          _estadoExpensa = estado;
+          _montoExpensa = (data['montoPagado'] as num?)?.toDouble() ?? 
+                          (data['montoExpensa'] as num?)?.toDouble();
           _fechaVencimiento = (data['fechaVencimiento'] as Timestamp?)?.toDate();
+          _mesesAdelantados = (data['mesesAdelantados'] as int?) ?? 0;
         });
       }
       
@@ -113,122 +139,256 @@ class _PagoExpensasScreenState extends State<PagoExpensasScreen> {
         text: _montoExpensa?.toString() ?? '');
     final conceptoController = TextEditingController(text: 'Expensa mensual');
     final comprobanteController = TextEditingController();
+    int mesesAdelantados = 1;
+    
+    // Calcular fecha de vencimiento según meses (acumulativo desde fecha actual de vencimiento)
+    DateTime calcularFechaVencimiento(int meses) {
+      // Usar la fecha de vencimiento existente como base, o la fecha actual si no hay
+      final fechaBase = _fechaVencimiento ?? DateTime.now();
+      int nuevoMes = fechaBase.month + meses;
+      int nuevoAnio = fechaBase.year;
+      while (nuevoMes > 12) {
+        nuevoMes -= 12;
+        nuevoAnio++;
+      }
+      return DateTime(nuevoAnio, nuevoMes, fechaBase.day > 28 ? 28 : fechaBase.day);
+    }
 
     await showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Registrar Pago'),
-        content: Form(
-          key: formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: montoController,
-                  decoration: const InputDecoration(labelText: 'Monto'),
-                  keyboardType: TextInputType.number,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Por favor ingrese un monto';
-                    }
-                    if (double.tryParse(value) == null) {
-                      return 'Ingrese un número válido';
-                    }
-                    return null;
-                  },
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final fechaVencimiento = calcularFechaVencimiento(mesesAdelantados);
+          
+          return AlertDialog(
+            title: const Text('Registrar Pago'),
+            content: Form(
+              key: formKey,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Selector de meses adelantados
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.calendar_month_rounded,
+                                color: Theme.of(context).colorScheme.primary,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'Meses a pagar',
+                                style: TextStyle(fontWeight: FontWeight.w600),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              IconButton(
+                                onPressed: mesesAdelantados > 1
+                                    ? () => setDialogState(() {
+                                        mesesAdelantados--;
+                                        montoController.text = ((_montoExpensa ?? 0) * mesesAdelantados).toString();
+                                      })
+                                    : null,
+                                icon: const Icon(Icons.remove_circle_outline),
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  '$mesesAdelantados ${mesesAdelantados == 1 ? 'mes' : 'meses'}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ),
+                              IconButton(
+                                onPressed: mesesAdelantados < 12
+                                    ? () => setDialogState(() {
+                                        mesesAdelantados++;
+                                        montoController.text = ((_montoExpensa ?? 0) * mesesAdelantados).toString();
+                                      })
+                                    : null,
+                                icon: const Icon(Icons.add_circle_outline),
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.green.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.check_circle, color: Colors.green, size: 18),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Pagado hasta: ${_formatearFecha(fechaVencimiento)}',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.green,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: montoController,
+                      decoration: InputDecoration(
+                        labelText: 'Monto total',
+                        prefixText: '\$ ',
+                        suffixText: mesesAdelantados > 1 ? '(${mesesAdelantados}x)' : null,
+                      ),
+                      keyboardType: TextInputType.number,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Por favor ingrese un monto';
+                        }
+                        if (double.tryParse(value) == null) {
+                          return 'Ingrese un número válido';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: conceptoController,
+                      decoration: InputDecoration(
+                        labelText: 'Concepto',
+                        hintText: mesesAdelantados > 1 
+                            ? 'Ej: Expensas adelantadas ($mesesAdelantados meses)'
+                            : 'Ej: Expensa mensual',
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Por favor ingrese un concepto';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: comprobanteController,
+                      decoration: const InputDecoration(
+                          labelText: 'Número de comprobante (opcional)'),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: conceptoController,
-                  decoration: const InputDecoration(labelText: 'Concepto'),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Por favor ingrese un concepto';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: comprobanteController,
-                  decoration: const InputDecoration(
-                      labelText: 'Número de comprobante (opcional)'),
-                ),
-              ],
+              ),
             ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (formKey.currentState!.validate()) {
-                Navigator.pop(context);
-                
-                setState(() {
-                  _cargando = true;
-                });
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Cancelar'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  if (formKey.currentState!.validate()) {
+                    Navigator.pop(dialogContext);
+                    
+                    setState(() {
+                      _cargando = true;
+                    });
 
-                // Capturar el ScaffoldMessengerState ANTES de cualquier operación asíncrona
-                // para evitar el uso de BuildContext a través de async gaps
-                final scaffoldMessengerState = ScaffoldMessenger.of(context);
-                
-                try {
-                  // Registrar el pago
-                  await FirebaseFirestore.instance
-                      .collection('condominios')
-                      .doc(widget.propietario.condominio)
-                      .collection('casas')
-                      .doc(widget.propietario.casa.numero.toString())
-                      .collection('pagos')
-                      .add({
-                    'monto': double.parse(montoController.text),
-                    'fecha': Timestamp.now(),
-                    'concepto': conceptoController.text,
-                    'comprobante': comprobanteController.text,
-                  });
+                    final scaffoldMessengerState = ScaffoldMessenger.of(context);
+                    final proximoVencimiento = calcularFechaVencimiento(mesesAdelantados);
+                    
+                    try {
+                      // Registrar el pago
+                      await FirebaseFirestore.instance
+                          .collection('condominios')
+                          .doc(widget.propietario.condominio)
+                          .collection('casas')
+                          .doc(widget.propietario.casa.numero.toString())
+                          .collection('pagos')
+                          .add({
+                        'monto': double.parse(montoController.text),
+                        'fecha': Timestamp.now(),
+                        'concepto': mesesAdelantados > 1 
+                            ? 'Pago adelantado ($mesesAdelantados meses) - ${conceptoController.text}'
+                            : conceptoController.text,
+                        'comprobante': comprobanteController.text,
+                        'mesesPagados': mesesAdelantados,
+                        'fechaVencimientoHasta': Timestamp.fromDate(proximoVencimiento),
+                      });
+                      
+                      // Actualizar estado de la expensa (acumular meses adelantados)
+                      final nuevoTotalMeses = _mesesAdelantados + mesesAdelantados;
+                      await FirebaseFirestore.instance
+                          .collection('condominios')
+                          .doc(widget.propietario.condominio)
+                          .collection('casas')
+                          .doc(widget.propietario.casa.numero.toString())
+                          .update({
+                        'estadoExpensa': 'pagada',
+                        'montoPagado': double.parse(montoController.text),
+                        'fechaPago': Timestamp.now(),
+                        'fechaVencimiento': Timestamp.fromDate(proximoVencimiento),
+                        'mesesAdelantados': nuevoTotalMeses,
+                      });
+                    
+                      await _cargarDatosExpensa();
 
-                  // Actualizar estado de la expensa
-                  await FirebaseFirestore.instance
-                      .collection('condominios')
-                      .doc(widget.propietario.condominio)
-                      .collection('casas')
-                      .doc(widget.propietario.casa.numero.toString())
-                      .update({
-                    'estadoExpensa': 'Pagado',
-                    'fechaPago': Timestamp.now(),
-                  });
-                
-                  // Recargar datos
-                  await _cargarDatosExpensa();
-
-                  // Verificar que el widget sigue montado antes de mostrar el SnackBar
-                  if (mounted) {
-                    scaffoldMessengerState.showSnackBar(
-                      const SnackBar(content: Text('Pago registrado con éxito')),
-                    );
+                      if (mounted) {
+                        scaffoldMessengerState.showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              mesesAdelantados > 1
+                                  ? 'Pago adelantado registrado. Pagado hasta ${_formatearFecha(proximoVencimiento)}'
+                                  : 'Pago registrado con éxito',
+                            ),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        scaffoldMessengerState.showSnackBar(
+                          SnackBar(content: Text('Error al registrar pago: $e')),
+                        );
+                      }
+                    } finally {
+                      setState(() {
+                        _cargando = false;
+                      });
+                    }
                   }
-                } catch (e) {
-                  // Verificar que el widget sigue montado antes de mostrar el SnackBar de error
-                  if (mounted) {
-                    scaffoldMessengerState.showSnackBar(
-                      SnackBar(content: Text('Error al registrar pago: $e')),
-                    );
-                  }
-                } finally {
-                  setState(() {
-                    _cargando = false;
-                  });
-                }
-              }
-            },
-            child: const Text('Registrar'),
-          ),
-        ],
+                },
+                child: Text(mesesAdelantados > 1 ? 'Pagar Adelantado' : 'Registrar'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -327,6 +487,63 @@ class _PagoExpensasScreenState extends State<PagoExpensasScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    // Alerta de vencimiento próximo o vencido
+                    if (_vencido || _proximoAVencer) ...[
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: _vencido 
+                            ? Colors.red.withValues(alpha: 0.15)
+                            : Colors.orange.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: _vencido ? Colors.red : Colors.orange,
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              _vencido ? Icons.warning_rounded : Icons.schedule,
+                              color: _vencido ? Colors.red : Colors.orange,
+                              size: 28,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _vencido 
+                                      ? '¡Expensa vencida!' 
+                                      : '¡Próximo a vencer!',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                      color: _vencido ? Colors.red : Colors.orange,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    _vencido
+                                      ? 'Tu expensa está en mora. Realiza el pago lo antes posible.'
+                                      : 'Faltan $_diasParaVencimiento días para el vencimiento.',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: _vencido 
+                                        ? Colors.red.shade700 
+                                        : Colors.orange.shade700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                    
                     // Tarjeta de estado actual mejorada
                     Container(
                       decoration: BoxDecoration(
@@ -470,7 +687,88 @@ class _PagoExpensasScreenState extends State<PagoExpensasScreen> {
                                   ),
                               ],
                             ),
+                            // Indicador de meses adelantados
+                            if (_mesesAdelantados > 1) ...[
+                              const SizedBox(height: 12),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.event_available, color: Colors.white, size: 18),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Pagado $_mesesAdelantados meses adelantado',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // Botón de pago adelantado siempre visible
+                    Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            colorScheme.primary,
+                            colorScheme.primary.withValues(alpha: 0.8),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: colorScheme.primary.withValues(alpha: 0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: _registrarPago,
+                          borderRadius: BorderRadius.circular(16),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  _estadoExpensa == 'Pagado' 
+                                      ? Icons.schedule_send_rounded 
+                                      : Icons.payment_rounded,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
+                                const SizedBox(width: 12),
+                                Text(
+                                  _estadoExpensa == 'Pagado' 
+                                      ? 'Pagar Meses Adelantados' 
+                                      : 'Registrar Pago',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -667,14 +965,6 @@ class _PagoExpensasScreenState extends State<PagoExpensasScreen> {
                 ),
               ),
             ),
-      floatingActionButton: _estadoExpensa != 'Pagado'
-          ? FloatingActionButton.extended(
-              onPressed: _registrarPago,
-              icon: const Icon(Icons.payment),
-              label: const Text('Registrar Pago'),
-              backgroundColor: Theme.of(context).colorScheme.primary,
-            )
-          : null,
       ),
     );
   }

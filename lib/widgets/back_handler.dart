@@ -27,10 +27,13 @@ class BackHandler extends StatelessWidget {
           return;
         }
 
-        // Verificar si podemos hacer pop en el router (dinámicamente)
+        final navigator = Navigator.of(context);
+        if (navigator.canPop()) {
+          navigator.pop();
+          return;
+        }
         final router = GoRouter.of(context);
         if (router.canPop()) {
-          // Si hay historial, navegar hacia atrás
           router.pop();
         }
         // Si no hay historial, no hacer nada (no cerrar la app automáticamente)

@@ -11,7 +11,6 @@ import 'screens/propietario/panel_propietario_screen.dart';
 import 'screens/qr/solicitud_qr_screen.dart';
 import 'screens/qr/mi_qr_screen.dart';
 import 'screens/qr/mis_qrs_screen.dart';
-import 'theme_manager.dart';
 import 'app_theme.dart';
 import 'screens/common/help_center_screen.dart';
 import 'screens/common/about_screen.dart';
@@ -57,6 +56,8 @@ final GoRouter _router = GoRouter(
           usosRestantes: data['usosRestantes'] as int?,
           codigoQr: data['codigoQr']?.toString(),
           fechaExpiracion: data['fechaExpiracion']?.toString(),
+          esSalida: data['esSalida'] as bool? ?? false,
+          forzarCodigoCasa: data['forzarCodigoCasa'] as bool? ?? false,
         );
       },
     ),
@@ -102,17 +103,12 @@ class FortGuards extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<ThemeMode>(
-      valueListenable: ThemeManager.notifier,
-      builder: (context, mode, _) {
-        return MaterialApp.router(
+    return MaterialApp.router(
       routerConfig: _router,
       title: 'Gestión de Condominios',
-      themeMode: mode,
-      theme: AppTheme.light,
-      darkTheme: AppTheme.dark,
+      themeMode: ThemeMode.light,
+      theme: AppTheme.theme,
+      darkTheme: AppTheme.theme,
     );
-  },
-);
   }
 }

@@ -9,6 +9,7 @@ class NotificacionModel {
   final DateTime fecha;
   final bool visto;
   final String tipo; // 'privada' o 'condominio'
+  final String? prioridad; // 'baja', 'media', 'alta', 'urgente'
 
   NotificacionModel({
     required this.id,
@@ -19,6 +20,7 @@ class NotificacionModel {
     required this.fecha,
     required this.visto,
     required this.tipo,
+    this.prioridad,
   });
 
   factory NotificacionModel.fromDoc(String id, Map<String, dynamic> data) {
@@ -31,6 +33,7 @@ class NotificacionModel {
       fecha: (data['fecha'] as Timestamp).toDate(),
       visto: data['visto'] ?? false,
       tipo: data['tipo'] ?? 'privada',
+      prioridad: data['prioridad'],
     );
   }
 
@@ -42,5 +45,6 @@ class NotificacionModel {
         'fecha': fecha,
         'visto': visto,
         'tipo': tipo,
+        'prioridad': prioridad,
       };
 }

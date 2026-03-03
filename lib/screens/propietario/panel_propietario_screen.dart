@@ -9,13 +9,13 @@ import '../../widgets/back_handler.dart';
 import '../../models/propietario_model.dart';
 import '../../core/codigo_casa_util.dart';
 import '../../services/alerta_service.dart';
+import '../../services/notificacion_service.dart';
 
 import 'package:fortguardsapp/screens/propietario/pago_expensas_screen.dart';
 import 'package:fortguardsapp/screens/propietario/gestionar_solicitudes_screen.dart';
 import 'package:fortguardsapp/screens/propietario/mis_qrs_invitados_screen.dart';
 import 'notificaciones_prop_screen.dart';
 import 'reservas_screen.dart';
-import '../../theme_manager.dart';
 
 class PanelPropietarioScreen extends StatefulWidget {
   const PanelPropietarioScreen({super.key});
@@ -25,6 +25,7 @@ class PanelPropietarioScreen extends StatefulWidget {
 }
 
 class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with SingleTickerProviderStateMixin {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   PropietarioModel? propietario;
   String? estadoExpensa;
   bool botonPeligroActivo = false;
@@ -32,6 +33,7 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
   // Información del código
   DateTime? codigoExpira;
   int? codigoUsos;
+  bool _codigoSincronizando = true;
 
   final List<String> alertas = [
     'Necesito ayuda en casa',
@@ -49,6 +51,12 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
   late Animation<double> _animacionForma;
   bool _mostrandoOpciones = false;
   final double _radiosBorde = 16.0; // Radio de los bordes en estado normal
+
+  bool _esExpensaPagada(String? estado) {
+    if (estado == null) return false;
+    final normalized = estado.toLowerCase();
+    return normalized.contains('pagad');
+  }
   
   @override
   void initState() {
@@ -86,6 +94,7 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
     _animacionController.dispose();
     _codigoSubscription?.cancel();
     _autoRenovacionSubscription?.cancel();
+    NotificacionService.detenerEscucha();
     super.dispose();
   }
 
@@ -198,7 +207,20 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
     if (!mounted) return;
     setState(() {
       propietario = modelo;
+      _codigoSincronizando = true;
     });
+    
+    // Suscribirse a tópicos FCM para recibir push notifications
+    NotificacionService.suscribirseATopicos(
+      condominio: modelo.condominio,
+      casaNumero: modelo.casa.numero,
+    );
+    
+    // Iniciar escucha de notificaciones push en tiempo real (backup local)
+    NotificacionService.escucharNotificaciones(
+      condominioId: modelo.condominio,
+      casaNumero: modelo.casa.numero,
+    );
 
     unawaited(_sincronizarDatosConFirestore(modelo));
   }
@@ -256,7 +278,15 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
         condominioId: base.condominio,
         casaNumero: base.casa.numero,
       );
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Error sincronizando código de casa: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _codigoSincronizando = false;
+        });
+      }
+    }
   }
 
   String _formatearFecha(DateTime fecha) {
@@ -264,241 +294,405 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
   }
 
   void _mostrarDialogoConfiguracion() {
-    int duracionHoras = 24; // Por defecto 24 horas (1 día)
-    int usos = 1; // Por defecto 1 uso
+    int duracionHoras = 24;
+    int usos = 1;
+    final usosController = TextEditingController(text: '1');
     
     showDialog(
       context: context,
       barrierDismissible: true,
       builder: (context) => StatefulBuilder(
-        builder: (context, setStateDialog) => Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          elevation: 8,
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(24),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Theme.of(context).colorScheme.surface,
-                  Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                ],
+        builder: (context, setStateDialog) {
+          final scheme = Theme.of(context).colorScheme;
+          
+          return Dialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+            elevation: 16,
+            child: Container(
+              width: double.infinity,
+              constraints: const BoxConstraints(maxWidth: 400),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(28),
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    scheme.surface,
+                    scheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                  ],
+                ),
               ),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Título con icono
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(12),
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Header con icono animado
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [scheme.primary, scheme.primary.withValues(alpha: 0.7)],
+                          ),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: scheme.primary.withValues(alpha: 0.4),
+                              blurRadius: 20,
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
+                        child: Icon(
+                          Icons.qr_code_rounded,
+                          color: scheme.onPrimary,
+                          size: 32,
+                        ),
                       ),
-                      child: Icon(
-                        Icons.settings,
-                        color: Theme.of(context).colorScheme.onPrimaryContainer,
-                        size: 24,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'Configurar código de casa',
+                      const SizedBox(height: 20),
+                      Text(
+                        'Generar Código de Acceso',
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
+                        textAlign: TextAlign.center,
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                
-                // Duración del código
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+                      const SizedBox(height: 8),
+                      Text(
+                        'Configura la duración y cantidad de usos permitidos',
+                        style: TextStyle(
+                          color: scheme.onSurface.withValues(alpha: 0.6),
+                          fontSize: 13,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 28),
+                      
+                      // Duración del código - Diseño mejorado
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: scheme.primaryContainer.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: scheme.primary.withValues(alpha: 0.3),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: scheme.primary.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Icon(
+                                    Icons.timer_outlined,
+                                    size: 22,
+                                    color: scheme.primary,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Text(
+                                  'Duración',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: scheme.onSurface,
+                                  ),
+                                ),
+                                const Spacer(),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: scheme.primary,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    '$duracionHoras ${duracionHoras == 1 ? "hora" : "horas"}',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: scheme.onPrimary,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 20),
+                            // Opciones rápidas de duración
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [1, 6, 12, 24, 48, 72].map((horas) {
+                                final selected = duracionHoras == horas;
+                                String label = horas < 24 
+                                    ? '${horas}h' 
+                                    : '${horas ~/ 24}d';
+                                return GestureDetector(
+                                  onTap: () => setStateDialog(() => duracionHoras = horas),
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 200),
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                    decoration: BoxDecoration(
+                                      color: selected 
+                                          ? scheme.primary 
+                                          : scheme.surfaceContainerHighest,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: selected 
+                                            ? scheme.primary 
+                                            : scheme.outline.withValues(alpha: 0.3),
+                                        width: selected ? 2 : 1,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      label,
+                                      style: TextStyle(
+                                        color: selected ? scheme.onPrimary : scheme.onSurface,
+                                        fontWeight: selected ? FontWeight.bold : FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      
+                      // Cantidad de usos - Con entrada manual
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: Colors.orange.withValues(alpha: 0.3),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: Colors.orange.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Icon(
+                                    Icons.repeat_rounded,
+                                    size: 22,
+                                    color: Colors.orange,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Text(
+                                  'Cantidad de Usos',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: scheme.onSurface,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            // Input manual de usos - Diseño mejorado
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  // Botón decrementar
+                                  Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      onTap: usos > 1 ? () {
+                                        setStateDialog(() {
+                                          usos--;
+                                          usosController.text = usos.toString();
+                                        });
+                                      } : null,
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(12),
+                                        decoration: BoxDecoration(
+                                          color: usos > 1 
+                                            ? Colors.orange.withValues(alpha: 0.2)
+                                            : scheme.outline.withValues(alpha: 0.1),
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: Icon(
+                                          Icons.remove_rounded,
+                                          color: usos > 1 ? Colors.orange : scheme.outline,
+                                          size: 24,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  // Campo de texto central
+                                  Expanded(
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                                      child: TextField(
+                                        controller: usosController,
+                                        keyboardType: TextInputType.number,
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          fontSize: 32,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.orange,
+                                        ),
+                                        decoration: const InputDecoration(
+                                          border: InputBorder.none,
+                                          contentPadding: EdgeInsets.zero,
+                                        ),
+                                        onChanged: (value) {
+                                          final parsed = int.tryParse(value);
+                                          if (parsed != null && parsed >= 1 && parsed <= 50) {
+                                            setStateDialog(() => usos = parsed);
+                                          }
+                                        },
+                                      ),
+                                    ),
+                                  ),
+                                  // Botón incrementar
+                                  Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      onTap: usos < 50 ? () {
+                                        setStateDialog(() {
+                                          usos++;
+                                          usosController.text = usos.toString();
+                                        });
+                                      } : null,
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(12),
+                                        decoration: BoxDecoration(
+                                          color: usos < 50 
+                                            ? Colors.orange.withValues(alpha: 0.2)
+                                            : scheme.outline.withValues(alpha: 0.1),
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: Icon(
+                                          Icons.add_rounded,
+                                          color: usos < 50 ? Colors.orange : scheme.outline,
+                                          size: 24,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            // Opciones rápidas de usos
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              alignment: WrapAlignment.center,
+                              children: [1, 5, 10, 20, 30, 50].map((cantidad) {
+                                final selected = usos == cantidad;
+                                return GestureDetector(
+                                  onTap: () {
+                                    setStateDialog(() {
+                                      usos = cantidad;
+                                      usosController.text = cantidad.toString();
+                                    });
+                                  },
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 200),
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: selected 
+                                          ? Colors.orange 
+                                          : scheme.surfaceContainerHighest,
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: selected 
+                                            ? Colors.orange 
+                                            : scheme.outline.withValues(alpha: 0.3),
+                                        width: selected ? 2 : 1,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      '$cantidad',
+                                      style: TextStyle(
+                                        color: selected ? Colors.white : scheme.onSurface,
+                                        fontWeight: selected ? FontWeight.bold : FontWeight.w500,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 28),
+                      
+                      // Botones de acción
                       Row(
                         children: [
-                          Icon(
-                            Icons.schedule,
-                            size: 20,
-                            color: Theme.of(context).colorScheme.primary,
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => Navigator.pop(context),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                side: BorderSide(color: scheme.outline.withValues(alpha: 0.5)),
+                              ),
+                              child: const Text('Cancelar'),
+                            ),
                           ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Duración del código:',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
+                          const SizedBox(width: 12),
+                          Expanded(
+                            flex: 2,
+                            child: FilledButton.icon(
+                              onPressed: () {
+                                // Validar que usos esté en rango
+                                final usosFinales = usos.clamp(1, 50);
+                                Navigator.pop(context);
+                                _generarNuevoCodigo(duracionHoras: duracionHoras, usos: usosFinales);
+                              },
+                              style: FilledButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              icon: const Icon(Icons.qr_code_2_rounded, size: 20),
+                              label: const Text(
+                                'Generar Código',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                              ),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 16),
-                      SliderTheme(
-                        data: SliderTheme.of(context).copyWith(
-                          trackHeight: 6,
-                          thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
-                          overlayShape: const RoundSliderOverlayShape(overlayRadius: 20),
-                        ),
-                        child: Slider(
-                          value: duracionHoras.toDouble(),
-                          min: 1,
-                          max: 24,
-                          divisions: 23,
-                          label: '$duracionHoras ${duracionHoras == 1 ? "hora" : "horas"}',
-                          onChanged: (value) {
-                            setStateDialog(() {
-                              duracionHoras = value.round();
-                            });
-                          },
-                        ),
-                      ),
-                      Center(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.primary,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            '$duracionHoras ${duracionHoras == 1 ? "hora" : "horas"}',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(context).colorScheme.onPrimary,
-                            ),
-                          ),
-                        ),
-                      ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 20),
-                
-                // Cantidad de usos
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.secondaryContainer.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.numbers,
-                            size: 20,
-                            color: Theme.of(context).colorScheme.secondary,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Cantidad de usos:',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      SliderTheme(
-                        data: SliderTheme.of(context).copyWith(
-                          trackHeight: 6,
-                          thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
-                          overlayShape: const RoundSliderOverlayShape(overlayRadius: 20),
-                        ),
-                        child: Slider(
-                          value: usos.toDouble(),
-                          min: 1,
-                          max: 10,
-                          divisions: 9,
-                          label: '$usos ${usos == 1 ? "uso" : "usos"}',
-                          onChanged: (value) {
-                            setStateDialog(() {
-                              usos = value.round();
-                            });
-                          },
-                        ),
-                      ),
-                      Center(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.primary,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            '$usos ${usos == 1 ? "uso" : "usos"}',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(context).colorScheme.onPrimary,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 24),
-                
-                // Botones
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    OutlinedButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: const Text('Cancelar'),
-                    ),
-                    const SizedBox(width: 12),
-                    FilledButton.icon(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        _generarNuevoCodigo(duracionHoras: duracionHoras, usos: usos);
-                      },
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      icon: const Icon(Icons.check_circle, size: 20),
-                      label: const Text(
-                        'Generar',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
@@ -800,9 +994,15 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
 
     return BackHandler(
       onBackPressed: () {
+        // Si el drawer está abierto, cerrarlo en lugar de navegar
+        if (_scaffoldKey.currentState?.isDrawerOpen ?? false) {
+          _scaffoldKey.currentState?.closeDrawer();
+          return;
+        }
         context.go('/acceso-general');
       },
       child: Scaffold(
+      key: _scaffoldKey,
       appBar: AppBar(
         title: const Text('PROPIETARIO'),
       ),
@@ -924,7 +1124,7 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
                   ),
                   _buildDrawerItem(
                     icon: Icons.qr_code_2,
-                    title: 'Crear QRs',
+                    title: 'QRs de invitados',
                     onTap: () {
                       Navigator.pop(context);
                       Navigator.push(context, MaterialPageRoute(
@@ -957,15 +1157,6 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
                     onTap: () {
                       Navigator.pop(context);
                       context.push('/terms');
-                    },
-                  ),
-                  SwitchListTile(
-                    secondary: Icon(Icons.brightness_6, color: Theme.of(context).colorScheme.primary),
-                    title: const Text('Tema oscuro'),
-                    value: ThemeManager.notifier.value == ThemeMode.dark,
-                    onChanged: (_) {
-                      ThemeManager.toggle();
-                      setState(() {});
                     },
                   ),
                 ],
@@ -1050,14 +1241,12 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
                     ),
                     const SizedBox(height: 20),
                     // Código con diseño mejorado
-                    Material(
-                      elevation: 2,
-                      borderRadius: BorderRadius.circular(16),
-                      color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    if (_codigoSincronizando)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(16),
+                          color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3),
                           border: Border.all(
                             color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
                             width: 2,
@@ -1065,32 +1254,71 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
-                          children: propietario!.codigoCasa
-                              .split('')
-                              .map((digit) => Material(
-                                    elevation: 6,
-                                    borderRadius: BorderRadius.circular(12),
-                                    color: Theme.of(context).colorScheme.primary,
-                                    child: Container(
-                                      margin: const EdgeInsets.symmetric(horizontal: 6),
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                      child: Text(
-                                        digit,
-                                        style: const TextStyle(
-                                          fontSize: 28,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.black,
+                          children: [
+                            SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Theme.of(context).colorScheme.primary,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Actualizando código...',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Theme.of(context).colorScheme.onSurface,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      Material(
+                        elevation: 2,
+                        borderRadius: BorderRadius.circular(16),
+                        color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
+                              width: 2,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: propietario!.codigoCasa
+                                .split('')
+                                .map((digit) => Material(
+                                      elevation: 6,
+                                      borderRadius: BorderRadius.circular(12),
+                                      color: Theme.of(context).colorScheme.primary,
+                                      child: Container(
+                                        margin: const EdgeInsets.symmetric(horizontal: 6),
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                        child: Text(
+                                          digit,
+                                          style: const TextStyle(
+                                            fontSize: 28,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.black,
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                  ))
-                              .toList(),
+                                    ))
+                                .toList(),
+                          ),
                         ),
                       ),
-                    ),
                     const SizedBox(height: 16),
                     // Información del código
-                    if (codigoExpira != null || codigoUsos != null)
+                    if (!_codigoSincronizando && (codigoExpira != null || codigoUsos != null))
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
@@ -1383,17 +1611,17 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: estadoExpensa == 'Pagado' 
-                              ? Theme.of(context).colorScheme.tertiaryContainer.withValues(alpha: 0.3)
+                          color: _esExpensaPagada(estadoExpensa)
+                              ? Colors.green.withValues(alpha: 0.12)
                               : Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.3),
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: Row(
                           children: [
                             Icon(
-                              estadoExpensa == 'Pagado' ? Icons.check_circle_rounded : Icons.warning_rounded,
-                              color: estadoExpensa == 'Pagado' 
-                                  ? Theme.of(context).colorScheme.tertiary
+                              _esExpensaPagada(estadoExpensa) ? Icons.check_circle_rounded : Icons.warning_rounded,
+                              color: _esExpensaPagada(estadoExpensa)
+                                  ? Colors.green
                                   : Theme.of(context).colorScheme.error,
                               size: 20,
                             ),
@@ -1403,8 +1631,8 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
                               style: TextStyle(
                                 fontWeight: FontWeight.w600,
                                 fontSize: 16,
-                                color: estadoExpensa == 'Pagado' 
-                                    ? Theme.of(context).colorScheme.onTertiaryContainer
+                                color: _esExpensaPagada(estadoExpensa)
+                                    ? Colors.green.shade800
                                     : Theme.of(context).colorScheme.onErrorContainer,
                               ),
                             ),
@@ -1412,8 +1640,8 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                               decoration: BoxDecoration(
-                                color: estadoExpensa == 'Pagado' 
-                                    ? Theme.of(context).colorScheme.tertiary
+                                color: _esExpensaPagada(estadoExpensa)
+                                    ? Colors.green
                                     : Theme.of(context).colorScheme.error,
                                 borderRadius: BorderRadius.circular(12),
                               ),
@@ -1422,8 +1650,8 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w600,
-                                  color: estadoExpensa == 'Pagado' 
-                                      ? Theme.of(context).colorScheme.onTertiary
+                                  color: _esExpensaPagada(estadoExpensa)
+                                      ? Colors.white
                                       : Theme.of(context).colorScheme.onError,
                                 ),
                               ),
@@ -1460,16 +1688,26 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
                     // Header
                     Row(
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.secondaryContainer.withValues(alpha: 0.3),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(
-                            Icons.people_alt_rounded,
-                            color: Theme.of(context).colorScheme.secondary,
-                            size: 24,
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => GestionarSolicitudesScreen(propietario: propietario!),
+                              ),
+                            );
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.secondaryContainer.withValues(alpha: 0.3),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              Icons.people_alt_rounded,
+                              color: Theme.of(context).colorScheme.secondary,
+                              size: 24,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -1511,10 +1749,36 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
                               final data = docs[index].data();
                               final nombre = data['nombre'] ?? '';
                               final ci = data['ci'] ?? '';
-                              final usos = data['codigoUsos'] ?? 1;
+                              final usos = data['usosRestantes'] ?? data['codigoUsos'] ?? 1;
+                              final codigoQr = data['codigoQr'] as String?;
                               return ListTile(
                                 title: Text(nombre),
-                                subtitle: Text('CI: $ci | Usos: $usos'),
+                                subtitle: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text('CI: $ci | Usos: $usos'),
+                                    ),
+                                    if (codigoQr != null && codigoQr.isNotEmpty)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: Colors.blue.withValues(alpha: 0.1),
+                                          borderRadius: BorderRadius.circular(10),
+                                          border: Border.all(
+                                            color: Colors.blue.withValues(alpha: 0.3),
+                                          ),
+                                        ),
+                                        child: const Text(
+                                          'QR creado',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.blue,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
                                 trailing: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [

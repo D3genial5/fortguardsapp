@@ -48,11 +48,12 @@ class _ReservasScreenState extends State<ReservasScreen> with SingleTickerProvid
     });
 
     try {
-      // Cargar áreas comunes del condominio
+      // Cargar áreas comunes del condominio (colección unificada con admin)
       final areasSnapshot = await FirebaseFirestore.instance
           .collection('condominios')
           .doc(widget.propietario.condominio)
-          .collection('areasComunes')
+          .collection('areas_comunes')
+          .where('activa', isEqualTo: true)
           .get();
 
       final areas = areasSnapshot.docs.map((doc) {
@@ -62,80 +63,19 @@ class _ReservasScreenState extends State<ReservasScreen> with SingleTickerProvid
           'nombre': data['nombre']?.toString() ?? 'Área sin nombre',
           'tipo': data['tipo']?.toString() ?? 'Otro',
           'descripcion': data['descripcion']?.toString() ?? '',
-          'horarioInicio': data['horarioInicio']?.toString() ?? '08:00',
-          'horarioFin': data['horarioFin']?.toString() ?? '22:00',
-          'imagen': data['imagen']?.toString(),
+          'horarioInicio': data['horaInicio']?.toString() ?? data['horarioInicio']?.toString() ?? '08:00',
+          'horarioFin': data['horaFin']?.toString() ?? data['horarioFin']?.toString() ?? '22:00',
+          'imagen': data['imagenUrl']?.toString() ?? data['imagen']?.toString(),
+          'capacidad': data['capacidad'] ?? 0,
+          'precioAdelanto': (data['precioAdelanto'] as num?)?.toDouble() ?? 0.0,
         };
       }).toList();
 
       // Si no hay áreas comunes, crear algunas por defecto
       if (areas.isEmpty) {
-        final batch = FirebaseFirestore.instance.batch();
-        
-        final areasDefault = [
-          {
-            'nombre': 'Cancha de Fútbol',
-            'tipo': 'cancha',
-            'descripcion': 'Cancha de fútbol 5 con césped sintético',
-            'horarioInicio': '08:00',
-            'horarioFin': '22:00',
-            'imagen': 'https://firebasestorage.googleapis.com/v0/b/fortguards.appspot.com/o/areas%2Fcancha.jpg?alt=media',
-          },
-          {
-            'nombre': 'Churrasquera Principal',
-            'tipo': 'churrasquera',
-            'descripcion': 'Área de parrilla con capacidad para 15 personas',
-            'horarioInicio': '10:00',
-            'horarioFin': '23:00',
-            'imagen': 'https://firebasestorage.googleapis.com/v0/b/fortguards.appspot.com/o/areas%2Fchurrasquera.jpg?alt=media',
-          },
-          {
-            'nombre': 'Salón de Eventos',
-            'tipo': 'salon',
-            'descripcion': 'Salón para eventos con capacidad para 50 personas',
-            'horarioInicio': '09:00',
-            'horarioFin': '00:00',
-            'imagen': 'https://firebasestorage.googleapis.com/v0/b/fortguards.appspot.com/o/areas%2Fsalon.jpg?alt=media',
-          },
-        ];
-        
-        for (final area in areasDefault) {
-          final docRef = FirebaseFirestore.instance
-              .collection('condominios')
-              .doc(widget.propietario.condominio)
-              .collection('areasComunes')
-              .doc();
-          
-          batch.set(docRef, {
-            ...area,
-            'creado': Timestamp.now(),
-          });
-        }
-        
-        await batch.commit();
-        
-        // Cargar nuevamente las áreas
-        final areasSnapshotNew = await FirebaseFirestore.instance
-            .collection('condominios')
-            .doc(widget.propietario.condominio)
-            .collection('areasComunes')
-            .get();
-
-        final areasNew = areasSnapshotNew.docs.map((doc) {
-          final data = doc.data();
-          return {
-            'id': doc.id,
-            'nombre': data['nombre']?.toString() ?? 'Área sin nombre',
-            'tipo': data['tipo']?.toString() ?? 'Otro',
-            'descripcion': data['descripcion']?.toString() ?? '',
-            'horarioInicio': data['horarioInicio']?.toString() ?? '08:00',
-            'horarioFin': data['horarioFin']?.toString() ?? '22:00',
-            'imagen': data['imagen']?.toString(),
-          };
-        }).toList();
-        
+        // No crear áreas por defecto - el admin las crea desde su app
         setState(() {
-          _areasComunes = areasNew;
+          _areasComunes = [];
         });
       } else {
         setState(() {
@@ -201,7 +141,7 @@ class _ReservasScreenState extends State<ReservasScreen> with SingleTickerProvid
             final areaDoc = await FirebaseFirestore.instance
                 .collection('condominios')
                 .doc(widget.propietario.condominio)
-                .collection('areasComunes')
+                .collection('areas_comunes')
                 .doc(areaId)
                 .get();
                 
@@ -488,6 +428,7 @@ class _ReservasScreenState extends State<ReservasScreen> with SingleTickerProvid
                       .collection('reservas')
                       .add({
                     'areaId': area['id'],
+                    'areaSocial': area['nombre'],
                     'casaNumero': widget.propietario.casa.numero,
                     'propietario': widget.propietario.casa.nombre,
                     'fecha': Timestamp.fromDate(DateTime(
@@ -495,11 +436,17 @@ class _ReservasScreenState extends State<ReservasScreen> with SingleTickerProvid
                       fechaReserva.month,
                       fechaReserva.day,
                     )),
+                    'fechaReserva': DateTime(
+                      fechaReserva.year,
+                      fechaReserva.month,
+                      fechaReserva.day,
+                    ).toIso8601String(),
                     'horaInicio': horaInicioController.text,
                     'horaFin': horaFinController.text,
                     'motivo': motivoController.text,
-                    'estado': 'confirmada',
+                    'estado': 'pendiente',
                     'creado': Timestamp.now(),
+                    'fechaSolicitud': DateTime.now().toIso8601String(),
                   });
 
                   // Recargar mis reservas
@@ -869,7 +816,9 @@ class _ReservasScreenState extends State<ReservasScreen> with SingleTickerProvid
             Tab(text: 'Áreas Comunes'),
           ],
           labelColor: Theme.of(context).colorScheme.primary,
+          unselectedLabelColor: const Color(0xFF6E6E73),
           indicatorColor: Theme.of(context).colorScheme.primary,
+          indicatorWeight: 3,
         ),
       ),
       body: _cargando

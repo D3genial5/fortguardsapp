@@ -48,7 +48,7 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
     final subtitleColor = isDark ? Colors.white70 : const Color(0xFF6B7280);
     
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF8F9FA),
+      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF6EEE3),
       appBar: AppBar(
         title: const Text('Solicitudes de Ingreso'),
         elevation: 0,
