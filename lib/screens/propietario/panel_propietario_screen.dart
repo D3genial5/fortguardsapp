@@ -241,6 +241,7 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
       String? expensa;
       DateTime? expiracion;
       int? usos;
+      String? codigoFirestore;
 
       if (doc.exists) {
         final data = doc.data()!;
@@ -254,6 +255,7 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
         if (data['codigoUsos'] != null) {
           usos = data['codigoUsos'] as int;
         }
+        codigoFirestore = data['codigoCasa']?.toString();
       }
 
       // Leer flag de expensas habilitadas del documento del condominio
@@ -264,15 +266,34 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
       final expensasFlag = condominioDoc.data()?['expensasHabilitadas'] ?? true;
 
       final identificador = '${base.condominio}_${base.casa.numero}';
-      final codigoDinamico = await CodigoCasaUtil.obtenerOCrearCodigo(identificador: identificador);
 
-      await FirebaseFirestore.instance
-          .collection('condominios')
-          .doc(base.condominio)
-          .collection('casas')
-          .doc(base.casa.numero.toString())
-          .set({'codigoCasa': codigoDinamico}, SetOptions(merge: true));
+      // ──────────────────────────────────────────────────────────────────
+      // FIRESTORE ES SOURCE OF TRUTH PARA codigoCasa
+      // ──────────────────────────────────────────────────────────────────
+      // Si Firestore ya tiene un código vigente (no expirado y con usos>0),
+      // usamos ESE. Si no, generamos uno nuevo localmente y lo persistimos.
+      // Esto evita que el código cambie cuando el propietario re-entra al
+      // panel mientras el visitante todavía no agotó el código.
+      final ahora = DateTime.now();
+      final firestoreCodeValid = codigoFirestore != null
+          && codigoFirestore.isNotEmpty
+          && (expiracion == null || expiracion.isAfter(ahora))
+          && (usos == null || usos > 0);
 
+      String codigoDinamico;
+      if (firestoreCodeValid) {
+        codigoDinamico = codigoFirestore;
+        // Sincronizamos también el secure storage local para que matches
+        try {
+          await CodigoCasaUtil.guardarCodigoLocal(identificador, codigoDinamico);
+        } catch (_) {/* no bloquea */}
+      } else {
+        // No hay código vigente en Firestore: generamos uno nuevo
+        codigoDinamico = await CodigoCasaUtil.obtenerOCrearCodigo(identificador: identificador);
+      }
+
+      // 1) UI primero: aseguramos que el código se vea aunque
+      //    Firestore después falle por red/regla.
       if (!mounted) return;
       setState(() {
         propietario = base.copyWith(codigoCasa: codigoDinamico, personas: personas);
@@ -281,6 +302,24 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
         codigoExpira = expiracion;
         codigoUsos = usos;
       });
+
+      // 2) Persistencia remota SOLO si generamos nuevo código.
+      //    Si vino de Firestore, ya está ahí — no escribimos para no
+      //    triggear listeners ni resetear usos.
+      if (!firestoreCodeValid) {
+        try {
+          await FirebaseFirestore.instance
+              .collection('condominios')
+              .doc(base.condominio)
+              .collection('casas')
+              .doc(base.casa.numero.toString())
+              .set({'codigoCasa': codigoDinamico}, SetOptions(merge: true));
+        } on FirebaseException catch (e) {
+          if (kDebugMode) {
+            debugPrint('Persistencia codigoCasa falló (no bloquea UI): ${e.code} ${e.message}');
+          }
+        }
+      }
 
       _escucharCambiosCodigo(base.condominio, base.casa.numero);
       _autoRenovacionSubscription?.cancel();
@@ -1024,8 +1063,8 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
         onBackPressed: () {
           context.go('/acceso-general');
         },
-        child: Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+        child: const Scaffold(
+          body: Center(child: CircularProgressIndicator()),
         ),
       );
     }
@@ -1037,6 +1076,8 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
           _scaffoldKey.currentState?.closeDrawer();
           return;
         }
+        // Volver al panel de accesos SIN cerrar sesión.
+        // El logout lo hace el botón "Cerrar sesión" del drawer.
         context.go('/acceso-general');
       },
       child: Scaffold(

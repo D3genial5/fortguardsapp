@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/qr_invitado_model.dart';
 import '../models/log_acceso_model.dart';
-import 'dart:developer' as dev;
+import '../core/app_log.dart';
 
 class QrService {
   static final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -12,9 +12,9 @@ class QrService {
   static Future<void> crearQrInvitado(QrInvitadoModel qr) async {
     try {
       await _db.collection(_collectionQr).doc(qr.codigo).set(qr.toFirestore());
-      dev.log('✅ QR creado: ${qr.codigo}', name: 'QrService');
+      AppLog.log('✅ QR creado: ${qr.codigo}', name: 'QrService');
     } catch (e) {
-      dev.log('❌ Error creando QR: $e', name: 'QrService');
+      AppLog.log('❌ Error creando QR: $e', name: 'QrService');
       rethrow;
     }
   }
@@ -26,7 +26,7 @@ class QrService {
       if (!doc.exists) return null;
       return QrInvitadoModel.fromFirestore(doc);
     } catch (e) {
-      dev.log('❌ Error obteniendo QR: $e', name: 'QrService');
+      AppLog.log('❌ Error obteniendo QR: $e', name: 'QrService');
       return null;
     }
   }
@@ -35,9 +35,9 @@ class QrService {
   static Future<void> actualizarQr(QrInvitadoModel qr) async {
     try {
       await _db.collection(_collectionQr).doc(qr.codigo).update(qr.toFirestore());
-      dev.log('✅ QR actualizado: ${qr.codigo}', name: 'QrService');
+      AppLog.log('✅ QR actualizado: ${qr.codigo}', name: 'QrService');
     } catch (e) {
-      dev.log('❌ Error actualizando QR: $e', name: 'QrService');
+      AppLog.log('❌ Error actualizando QR: $e', name: 'QrService');
       rethrow;
     }
   }
@@ -48,9 +48,9 @@ class QrService {
       await _db.collection(_collectionQr).doc(codigo).update({
         'estado': EstadoQr.revocado.name,
       });
-      dev.log('✅ QR revocado: $codigo', name: 'QrService');
+      AppLog.log('✅ QR revocado: $codigo', name: 'QrService');
     } catch (e) {
-      dev.log('❌ Error revocando QR: $e', name: 'QrService');
+      AppLog.log('❌ Error revocando QR: $e', name: 'QrService');
       rethrow;
     }
   }
@@ -82,11 +82,11 @@ class QrService {
         }
 
         transaction.update(docRef, updates);
-        dev.log('✅ Usos decrementados: $codigo ($nuevosUsos restantes)', name: 'QrService');
+        AppLog.log('✅ Usos decrementados: $codigo ($nuevosUsos restantes)', name: 'QrService');
         return true;
       });
     } catch (e) {
-      dev.log('❌ Error decrementando usos: $e', name: 'QrService');
+      AppLog.log('❌ Error decrementando usos: $e', name: 'QrService');
       return false;
     }
   }
@@ -110,9 +110,9 @@ class QrService {
   static Future<void> registrarAcceso(LogAccesoModel log) async {
     try {
       await _db.collection(_collectionLogs).add(log.toFirestore());
-      dev.log('✅ Log de acceso registrado: ${log.invitadoNombre}', name: 'QrService');
+      AppLog.log('✅ Log de acceso registrado: ${log.invitadoNombre}', name: 'QrService');
     } catch (e) {
-      dev.log('❌ Error registrando log: $e', name: 'QrService');
+      AppLog.log('❌ Error registrando log: $e', name: 'QrService');
       rethrow;
     }
   }
@@ -193,7 +193,7 @@ class QrService {
         'qr': qr,
       };
     } catch (e) {
-      dev.log('❌ Error validando QR: $e', name: 'QrService');
+      AppLog.log('❌ Error validando QR: $e', name: 'QrService');
       return {
         'valido': false,
         'mensaje': 'Error al validar QR: $e',
@@ -253,7 +253,7 @@ class QrService {
 
       return validacion;
     } catch (e) {
-      dev.log('❌ Error procesando acceso: $e', name: 'QrService');
+      AppLog.log('❌ Error procesando acceso: $e', name: 'QrService');
       return {
         'valido': false,
         'mensaje': 'Error procesando acceso: $e',

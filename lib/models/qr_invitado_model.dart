@@ -68,20 +68,20 @@ class QrInvitadoModel {
     final data = doc.data() as Map<String, dynamic>;
     return QrInvitadoModel(
       codigo: data['codigo'] ?? doc.id,
-      condominio: data['condominio'] ?? '',
-      casaNumero: data['casaNumero'] ?? 0,
+      condominio: (data['condominio'] as String?) ?? '',
+      casaNumero: (data['casaNumero'] as num?)?.toInt() ?? 0,
       tipo: TipoQr.values.firstWhere(
         (t) => t.name == data['tipo'],
         orElse: () => TipoQr.permanente,
       ),
-      invitadoNombre: data['invitadoNombre'] ?? '',
-      invitadoCi: data['invitadoCi'] ?? '',
+      invitadoNombre: (data['invitadoNombre'] as String?) ?? '',
+      invitadoCi: (data['invitadoCi'] as String?) ?? '',
       placaVehiculo: data['placaVehiculo'],
       usosRestantes: data['usosRestantes'],
       expira: data['expira'] != null
           ? (data['expira'] as Timestamp).toDate()
           : null,
-      creadoPor: data['creadoPor'] ?? '',
+      creadoPor: (data['creadoPor'] as String?) ?? '',
       creadoEn: data['creadoEn'] != null
           ? (data['creadoEn'] as Timestamp).toDate()
           : DateTime.now(),

@@ -41,6 +41,14 @@ class CodigoCasaUtil {
     return List.generate(3, (_) => random.nextInt(10)).join();
   }
 
+  /// Persiste un código que vino de Firestore para mantener cache local
+  /// sincronizado (no genera nada nuevo, solo guarda).
+  static Future<void> guardarCodigoLocal(String identificador, String codigo) async {
+    final hoy = DateTime.now().toIso8601String().substring(0, 10);
+    await _storage.write(key: 'codigo_$identificador', value: codigo);
+    await _storage.write(key: 'fecha_$identificador', value: hoy);
+  }
+
   /// Genera un nuevo código con duración y usos personalizados
   static Future<Map<String, dynamic>> generarNuevoCodigo({
     required String identificador,

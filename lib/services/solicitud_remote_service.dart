@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../models/solicitud_model.dart';
 
@@ -9,10 +10,18 @@ class SolicitudRemoteService {
   static final CollectionReference<Map<String, dynamic>> _collection =
       FirebaseFirestore.instance.collection('access_requests');
 
-  /// Guarda una nueva solicitud en Firestore
+  /// Guarda una nueva solicitud en Firestore.
+  ///
+  /// Requiere `auth.uid` (visitante anónimo o propietario logueado). Si no hay
+  /// user, intenta firma anónima antes de escribir.
   static Future<void> guardarSolicitud(SolicitudModel solicitud) async {
+    if (FirebaseAuth.instance.currentUser == null) {
+      await FirebaseAuth.instance.signInAnonymously();
+    }
+    final uid = FirebaseAuth.instance.currentUser!.uid;
     await _collection.add({
       ...solicitud.toJson(),
+      'creatorUid': uid,
       // Firestore almacena fechas como Timestamp por conveniencia.
       'fecha': Timestamp.fromDate(solicitud.fecha),
     });

@@ -60,13 +60,13 @@ class LogAccesoModel {
     final data = doc.data() as Map<String, dynamic>;
     return LogAccesoModel(
       id: doc.id,
-      qrCodigo: data['qrCodigo'] ?? '',
-      guardiaId: data['guardiaId'] ?? '',
-      guardiaNombre: data['guardiaNombre'] ?? '',
-      condominio: data['condominio'] ?? '',
-      casaNumero: data['casaNumero'] ?? 0,
-      invitadoNombre: data['invitadoNombre'] ?? '',
-      invitadoCi: data['invitadoCi'] ?? '',
+      qrCodigo: (data['qrCodigo'] as String?) ?? '',
+      guardiaId: (data['guardiaId'] as String?) ?? '',
+      guardiaNombre: (data['guardiaNombre'] as String?) ?? '',
+      condominio: (data['condominio'] as String?) ?? '',
+      casaNumero: (data['casaNumero'] as num?)?.toInt() ?? 0,
+      invitadoNombre: (data['invitadoNombre'] as String?) ?? '',
+      invitadoCi: (data['invitadoCi'] as String?) ?? '',
       placaVehiculo: data['placaVehiculo'],
       fecha: data['fecha'] != null
           ? (data['fecha'] as Timestamp).toDate()

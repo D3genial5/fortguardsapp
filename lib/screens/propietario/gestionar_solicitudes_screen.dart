@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import '../../widgets/back_handler.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/propietario_model.dart';
@@ -62,10 +63,10 @@ class _GestionarSolicitudesScreenState extends State<GestionarSolicitudesScreen>
       
       if (eliminados > 0) {
         await batch.commit();
-        debugPrint('✅ Eliminadas $eliminados solicitudes rechazadas antiguas');
+        if (kDebugMode) debugPrint('Eliminadas $eliminados solicitudes rechazadas antiguas');
       }
     } catch (e) {
-      debugPrint('Error limpiando solicitudes antiguas: $e');
+      if (kDebugMode) debugPrint('Error limpiando solicitudes antiguas: $e');
     }
   }
 
@@ -294,24 +295,36 @@ class _GestionarSolicitudesScreenState extends State<GestionarSolicitudesScreen>
                           Expanded(
                             child: OutlinedButton.icon(
                               onPressed: () => _rechazarSolicitud(docs[index].id, data),
-                              icon: const Icon(Icons.close, color: Colors.red),
+                              icon: const Icon(Icons.close, color: Colors.red, size: 18),
                               label: const Text(
                                 'Rechazar',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                softWrap: false,
                                 style: TextStyle(color: Colors.red),
                               ),
                               style: OutlinedButton.styleFrom(
+                                minimumSize: const Size.fromHeight(48),
                                 side: const BorderSide(color: Colors.red),
+                                padding: const EdgeInsets.symmetric(horizontal: 8),
                               ),
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 8),
                           Expanded(
                             child: FilledButton.icon(
                               onPressed: () => _aprobarSolicitud(docs[index].id, data),
-                              icon: const Icon(Icons.check),
-                              label: const Text('Aprobar'),
+                              icon: const Icon(Icons.check, size: 18),
+                              label: const Text(
+                                'Aprobar',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                softWrap: false,
+                              ),
                               style: FilledButton.styleFrom(
+                                minimumSize: const Size.fromHeight(48),
                                 backgroundColor: Colors.green,
+                                padding: const EdgeInsets.symmetric(horizontal: 8),
                               ),
                             ),
                           ),
@@ -662,12 +675,28 @@ class _GestionarSolicitudesScreenState extends State<GestionarSolicitudesScreen>
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancelar'),
+              style: TextButton.styleFrom(
+                minimumSize: const Size.fromHeight(52),
+              ),
+              child: const Text(
+                'Cancelar',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                softWrap: false,
+              ),
             ),
             FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: Colors.red),
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.red,
+                minimumSize: const Size.fromHeight(52),
+              ),
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('Rechazar'),
+              child: const Text(
+                'Rechazar',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                softWrap: false,
+              ),
             ),
           ],
         ),
@@ -710,15 +739,27 @@ class _GestionarSolicitudesScreenState extends State<GestionarSolicitudesScreen>
     
     return StatefulBuilder(
       builder: (context, setStateDialog) {
+        final size = MediaQuery.of(context).size;
+        final dialogMaxHeight = size.height * 0.88;
+        final dialogMaxWidth = size.width * 0.94;
+
         return Dialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            constraints: const BoxConstraints(maxWidth: 400),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: dialogMaxWidth.clamp(320.0, 420.0),
+              maxHeight: dialogMaxHeight,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                 // Header
                 Row(
                   children: [
@@ -816,27 +857,34 @@ class _GestionarSolicitudesScreenState extends State<GestionarSolicitudesScreen>
                   (unidad) => setStateDialog(() => duracionUnidad = unidad),
                 ),
                 if (tipoAcceso == 'indefinido') ..._buildConfiguracionIndefinidoApprove(),
-                
-                const SizedBox(height: 24),
-                
-                // Botones
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Botones
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final usarColumna = constraints.maxWidth < 340;
+
+                      final botonCancelar = OutlinedButton(
                         onPressed: () => Navigator.pop(context),
                         style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          minimumSize: const Size.fromHeight(52),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        child: const Text('Cancelar'),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: FilledButton(
+                        child: const Text(
+                          'Cancelar',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          softWrap: false,
+                        ),
+                      );
+
+                      final botonAprobar = FilledButton(
                         onPressed: () {
                           Map<String, dynamic> resultado = {'usos': usos};
                           
@@ -890,17 +938,40 @@ class _GestionarSolicitudesScreenState extends State<GestionarSolicitudesScreen>
                         },
                         style: FilledButton.styleFrom(
                           backgroundColor: Colors.green,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          minimumSize: const Size.fromHeight(52),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        child: const Text('Aprobar'),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+                        child: const Text(
+                          'Aprobar',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          softWrap: false,
+                        ),
+                      );
+
+                      if (usarColumna) {
+                        return Column(
+                          children: [
+                            SizedBox(width: double.infinity, child: botonCancelar),
+                            const SizedBox(height: 10),
+                            SizedBox(width: double.infinity, child: botonAprobar),
+                          ],
+                        );
+                      }
+
+                      return Row(
+                        children: [
+                          Expanded(child: botonCancelar),
+                          const SizedBox(width: 12),
+                          Expanded(child: botonAprobar),
+                        ],
+                      );
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -1039,71 +1110,85 @@ class _GestionarSolicitudesScreenState extends State<GestionarSolicitudesScreen>
               ),
             ),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  flex: 2,
-                  child: Column(
-                    children: [
-                      Slider(
-                        value: valor.toDouble(),
-                        min: 1,
-                        max: unidad == 'días' ? 30 : unidad == 'semanas' ? 12 : unidad == 'meses' ? 12 : 5,
-                        divisions: (unidad == 'días' ? 29 : unidad == 'semanas' ? 11 : unidad == 'meses' ? 11 : 4),
-                        label: '$valor',
-                        activeColor: Colors.blue,
-                        onChanged: (value) => onValorChanged(value.round()),
-                      ),
-                      Text(
-                        '$valor',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blue,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  flex: 1,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.withValues(alpha: 0.5)),
-                      borderRadius: BorderRadius.circular(8),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final usarColumna = constraints.maxWidth < 340;
+
+                final sliderBlock = Column(
+                  children: [
+                    Slider(
+                      value: valor.toDouble(),
+                      min: 1,
+                      max: unidad == 'días' ? 30 : unidad == 'semanas' ? 12 : unidad == 'meses' ? 12 : 5,
+                      divisions: (unidad == 'días' ? 29 : unidad == 'semanas' ? 11 : unidad == 'meses' ? 11 : 4),
+                      label: '$valor',
+                      activeColor: Colors.blue,
+                      onChanged: (value) => onValorChanged(value.round()),
                     ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: unidad,
-                        isExpanded: true,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        items: ['días', 'semanas', 'meses', 'años'].map((String value) {
-                          return DropdownMenuItem<String>(
-                            value: value,
-                            child: Text(
-                              value,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: Colors.black87,
-                              ),
+                    Text(
+                      '$valor',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue,
+                      ),
+                    ),
+                  ],
+                );
+
+                final unidadDropDown = Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.withValues(alpha: 0.5)),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: unidad,
+                      isExpanded: true,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      items: ['días', 'semanas', 'meses', 'años'].map((String value) {
+                        return DropdownMenuItem<String>(
+                          value: value,
+                          child: Text(
+                            value,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Colors.black87,
                             ),
-                          );
-                        }).toList(),
-                        onChanged: (String? newValue) {
-                          if (newValue != null) {
-                            onUnidadChanged(newValue);
-                            if (newValue == 'días' && valor > 30) onValorChanged(30);
-                            if (newValue == 'semanas' && valor > 12) onValorChanged(12);
-                            if (newValue == 'meses' && valor > 12) onValorChanged(12);
-                            if (newValue == 'años' && valor > 5) onValorChanged(5);
-                          }
-                        },
-                      ),
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (String? newValue) {
+                        if (newValue != null) {
+                          onUnidadChanged(newValue);
+                          if (newValue == 'días' && valor > 30) onValorChanged(30);
+                          if (newValue == 'semanas' && valor > 12) onValorChanged(12);
+                          if (newValue == 'meses' && valor > 12) onValorChanged(12);
+                          if (newValue == 'años' && valor > 5) onValorChanged(5);
+                        }
+                      },
                     ),
                   ),
-                ),
-              ],
+                );
+
+                if (usarColumna) {
+                  return Column(
+                    children: [
+                      sliderBlock,
+                      const SizedBox(height: 12),
+                      SizedBox(width: double.infinity, child: unidadDropDown),
+                    ],
+                  );
+                }
+
+                return Row(
+                  children: [
+                    Expanded(flex: 2, child: sliderBlock),
+                    const SizedBox(width: 16),
+                    Expanded(flex: 1, child: unidadDropDown),
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 8),
             Center(

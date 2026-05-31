@@ -30,35 +30,35 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
 
-  flutter_riverpod: ^2.4.0 # o última versión
-  go_router: ^10.0.0       # para navegación declarativa.
+  go_router: ^13.0.1
   cupertino_icons: ^1.0.8
   qr_flutter: ^4.1.0
-  screen_protector: ^1.4.2
+  screen_protector: ^1.5.1
   shared_preferences: ^2.2.2
-  intl: ^0.20.2
-  # Firebase
-  firebase_core: ^2.31.0
-  cloud_firestore: ^4.17.0
-  firebase_messaging: ^14.7.11
-  firebase_storage: ^11.7.0
-  firebase_crashlytics: ^3.5.0
+  intl: ^0.19.0
+  # Firebase — alineado con admin_fortguards (3.x)
+  firebase_core: ^3.14.0
+  firebase_auth: ^5.6.2
+  cloud_firestore: ^5.6.9
+  cloud_functions: ^5.4.0
+  firebase_messaging: ^15.0.0
+  firebase_storage: ^12.0.0
+  firebase_crashlytics: ^4.3.2
   # Notificaciones locales
   flutter_local_notifications: ^17.2.3
   timezone: ^0.9.4
   image_picker: ^1.1.2
-  # Crypto para QR
+  # Crypto local (uso menor — para legacy compat / hashing visitanteCi local)
   crypto: ^3.0.3
-  # Adicionales necesarias
   device_info_plus: ^10.1.0
   gal: ^2.3.0
   permission_handler: ^11.3.1
   flutter_secure_storage: ^9.2.4
   http: ^1.2.0
   url_launcher: ^6.3.0
-  # Background sync
-  # workmanager: ^0.5.2  # Comentado temporalmente - versión incompatible
 
 dev_dependencies:
   flutter_test:

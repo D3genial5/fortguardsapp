@@ -23,9 +23,34 @@ class SeleccionCondominioScreen extends StatelessWidget {
 
       body: Padding(
         padding: const EdgeInsets.all(16),
-        child: StreamBuilder<List<String>>( 
+        child: StreamBuilder<List<String>>(
           stream: CondominioService.streamCondominios(),
           builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.error_outline, size: 56, color: Colors.red),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'No se pudieron cargar los condominios',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '${snapshot.error}',
+                        style: const TextStyle(fontSize: 12, color: Colors.black54),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
             if (!snapshot.hasData) {
               return const Center(child: CircularProgressIndicator());
             }

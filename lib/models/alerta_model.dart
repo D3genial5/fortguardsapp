@@ -32,12 +32,12 @@ class AlertaModel {
   factory AlertaModel.fromFirestore(Map<String, dynamic> data, String id) {
     return AlertaModel(
       id: id,
-      tipo: data['tipo'] ?? 'alerta',
-      casaNumero: data['casaNumero'] ?? 0,
-      condominio: data['condominio'] ?? '',
-      propietarioId: data['propietarioId'] ?? '',
-      propietarioNombre: data['propietarioNombre'] ?? '',
-      estado: data['estado'] ?? 'activa',
+      tipo: (data['tipo'] as String?) ?? 'alerta',
+      casaNumero: (data['casaNumero'] as num?)?.toInt() ?? 0,
+      condominio: (data['condominio'] as String?) ?? '',
+      propietarioId: (data['propietarioId'] as String?) ?? '',
+      propietarioNombre: (data['propietarioNombre'] as String?) ?? '',
+      estado: (data['estado'] as String?) ?? 'activa',
       atendidaPor: data['atendidaPor'],
       atendidaPorNombre: data['atendidaPorNombre'],
       atendidaAt: data['atendidaAt'] != null 

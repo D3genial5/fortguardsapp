@@ -98,12 +98,12 @@ class MigrationService {
           
         } catch (e) {
           errores++;
-          debugPrint('Error migrando doc ${doc.id}: $e');
+          if (kDebugMode) debugPrint('Error migrando doc ${doc.id}: $e');
         }
       }
       
     } catch (e) {
-      debugPrint('Error en migración: $e');
+      if (kDebugMode) debugPrint('Error en migración: $e');
     }
     
     return {
@@ -139,15 +139,17 @@ class MigrationService {
           completos++;
         } else {
           incompletos++;
-          debugPrint('Doc incompleto: ${doc.id}');
-          debugPrint('  tipoAcceso: ${data['tipoAcceso']}');
-          debugPrint('  usosRestantes: ${data['usosRestantes']}');
-          debugPrint('  codigoQr: ${data['codigoQr']}');
+          if (kDebugMode) {
+            debugPrint('Doc incompleto: ${doc.id}');
+            debugPrint('  tipoAcceso: ${data['tipoAcceso']}');
+            debugPrint('  usosRestantes: ${data['usosRestantes']}');
+            debugPrint('  codigoQr: ${data['codigoQr']}');
+          }
         }
       }
       
     } catch (e) {
-      debugPrint('Error verificando: $e');
+      if (kDebugMode) debugPrint('Error verificando: $e');
     }
     
     return {

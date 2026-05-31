@@ -52,7 +52,7 @@ class _SolicitudQrScreenState extends State<SolicitudQrScreen> {
     setState(() {});
   }
 
-  void _enviarSolicitud() async {
+  Future<void> _enviarSolicitud() async {
     if (_isSubmitting) return;
 
     final nombreApellidos = _nombreApellidosController.text.trim();
@@ -165,6 +165,12 @@ class _SolicitudQrScreenState extends State<SolicitudQrScreen> {
                   StreamBuilder<List<String>>(
               stream: CondominioService.streamCondominios(),
               builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return Text(
+                    'Error: ${snapshot.error}',
+                    style: const TextStyle(color: Colors.red, fontSize: 12),
+                  );
+                }
                 if (!snapshot.hasData) {
                   return const Center(child: CircularProgressIndicator());
                 }
@@ -190,6 +196,12 @@ class _SolicitudQrScreenState extends State<SolicitudQrScreen> {
               StreamBuilder<List<int>>(
                 stream: CondominioService.streamCasas(_condominioSeleccionado!),
                 builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    return Text(
+                      'Error: ${snapshot.error}',
+                      style: const TextStyle(color: Colors.red, fontSize: 12),
+                    );
+                  }
                   if (!snapshot.hasData) {
                     return const Center(child: CircularProgressIndicator());
                   }

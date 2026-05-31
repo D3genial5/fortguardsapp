@@ -89,7 +89,7 @@ class _LoginScreenState extends State<LoginScreen>
     }
   }
 
-  void _login() async {
+  Future<void> _login() async {
     if (_isLoggingIn) return;
 
     final condominio = _condominioController.text.trim();
@@ -177,11 +177,19 @@ class _LoginScreenState extends State<LoginScreen>
       } else {
         _mostrarError('Datos incorrectos');
       }
-    } catch (e) {
+    } catch (e, st) {
+      if (kDebugMode) {
+        // ignore: avoid_print
+        debugPrint('🔴 LOGIN ERROR: $e');
+        // ignore: avoid_print
+        debugPrint('🔴 STACK: $st');
+      }
       if (mounted) {
         Navigator.of(context, rootNavigator: true).popUntil((route) => route is! PopupRoute);
       }
-      _mostrarError('No se pudo iniciar sesión. Verifica tus datos e intenta nuevamente.');
+      _mostrarError(kDebugMode
+          ? 'DEBUG: $e'
+          : 'No se pudo iniciar sesión. Verifica tus datos e intenta nuevamente.');
     } finally {
       if (mounted) {
         setState(() {
@@ -193,7 +201,11 @@ class _LoginScreenState extends State<LoginScreen>
 
   void _irAlPanelPropietario() {
     if (!mounted) return;
-    context.go('/propietario');
+    // Stack final: [/acceso-general, /propietario].
+    // Así el back del sistema pops el panel y aterriza en AccesoGeneral
+    // (no cierra la app). El propietario sigue autenticado en Firebase Auth.
+    context.go('/acceso-general');
+    context.push('/propietario');
   }
 
   void _mostrarError(String mensaje) {

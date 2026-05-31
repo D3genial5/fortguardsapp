@@ -10,6 +10,7 @@ import '../../models/qr_local_model.dart';
 import '../../models/propietario_model.dart';
 import '../../services/qr_local_service.dart';
 import '../../services/migration_service.dart';
+import '../../services/secure_storage_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class MiQrScreen extends StatefulWidget {
@@ -23,7 +24,8 @@ class _MiQrScreenState extends State<MiQrScreen> {
   String? _nombre;
   String? _ci;
   List<SolicitudModel> _solicitudes = [];
-  bool _isLoading = false;
+  bool _isSavingQr = false;
+  bool _isInitialLoading = true;
 
   @override
   void initState() {
@@ -54,15 +56,22 @@ class _MiQrScreenState extends State<MiQrScreen> {
 
   Future<void> _cargarDatosVisitante() async {
     final messenger = ScaffoldMessenger.of(context);
+    if (mounted) {
+      setState(() {
+        _isInitialLoading = true;
+      });
+    }
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final nombre = prefs.getString('visitante_nombre');
-      final ci = prefs.getString('visitante_ci');
+      final nombre = await SecureStorageService.getVisitanteNombre();
+      final ci = await SecureStorageService.getVisitanteCi();
 
       if (nombre == null || ci == null) {
         if (!mounted) return;
         setState(() {
+          _nombre = null;
           _ci = null;
+          _solicitudes = [];
+          _isInitialLoading = false;
         });
         return;
       }
@@ -115,9 +124,13 @@ class _MiQrScreenState extends State<MiQrScreen> {
         _nombre = nombre;
         _ci = ci;
         _solicitudes = solicitudes;
+        _isInitialLoading = false;
       });
     } catch (e) {
       if (!mounted) return;
+      setState(() {
+        _isInitialLoading = false;
+      });
       messenger.showSnackBar(
         const SnackBar(content: Text('Error al cargar solicitudes')),
       );
@@ -125,7 +138,7 @@ class _MiQrScreenState extends State<MiQrScreen> {
   }
 
   Future<void> _descargarQr(SolicitudModel solicitud) async {
-    setState(() => _isLoading = true);
+    setState(() => _isSavingQr = true);
     final messenger = ScaffoldMessenger.of(context);
     
     try {
@@ -197,7 +210,7 @@ class _MiQrScreenState extends State<MiQrScreen> {
       );
     } finally {
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() => _isSavingQr = false);
       }
     }
   }
@@ -277,6 +290,45 @@ class _MiQrScreenState extends State<MiQrScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isInitialLoading) {
+      final screenWidth = MediaQuery.of(context).size.width;
+      final logoWidth = (screenWidth * 0.5).clamp(160.0, 260.0);
+      final lettersWidth = (screenWidth * 0.62).clamp(180.0, 300.0);
+      return BackHandler(
+        child: Scaffold(
+          body: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Image.asset(
+                  'assets/FORTGUARD-LOGO.png',
+                  width: logoWidth,
+                  fit: BoxFit.contain,
+                ),
+                const SizedBox(height: 12),
+                Image.asset(
+                  'assets/fortguard_letras.png',
+                  width: lettersWidth,
+                  fit: BoxFit.contain,
+                ),
+                const SizedBox(height: 28),
+                const SizedBox(
+                  width: 36,
+                  height: 36,
+                  child: CircularProgressIndicator(strokeWidth: 3),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Cargando accesos...',
+                  style: Theme.of(context).textTheme.bodyLarge,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     if (_ci == null) {
       return BackHandler(
         child: Scaffold(
@@ -288,8 +340,16 @@ class _MiQrScreenState extends State<MiQrScreen> {
               const SizedBox(height: 24),
               ElevatedButton.icon(
                 onPressed: _irASolicitar,
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(52),
+                ),
                 icon: const Icon(Icons.edit),
-                label: const Text('Registrar información'),
+                label: const Text(
+                  'Registrar información',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  softWrap: false,
+                ),
               ),
             ],
           ),
@@ -354,6 +414,30 @@ class _MiQrScreenState extends State<MiQrScreen> {
                                   color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                                 ),
                             textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 24),
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 340),
+                            child: SizedBox(
+                              width: double.infinity,
+                              child: FilledButton.icon(
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: const Color(0xFFFF4200),
+                                  foregroundColor: Colors.black,
+                                  minimumSize: const Size.fromHeight(60),
+                                  textStyle: const TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(18),
+                                  ),
+                                ),
+                                onPressed: _irASolicitar,
+                                icon: const Icon(Icons.add, size: 26),
+                                label: const Text('Solicitar acceso'),
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -420,7 +504,10 @@ class _MiQrScreenState extends State<MiQrScreen> {
 
                                         final botonVerQr = FilledButton.icon(
                                           icon: const Icon(Icons.qr_code),
-                                          onPressed: (_isLoading || qrInvalido) ? null : () => _verQr(s),
+                                          onPressed: (_isSavingQr || qrInvalido) ? null : () => _verQr(s),
+                                          style: FilledButton.styleFrom(
+                                            minimumSize: const Size.fromHeight(52),
+                                          ),
                                           label: const Text(
                                             'Ver QR',
                                             maxLines: 1,
@@ -430,7 +517,7 @@ class _MiQrScreenState extends State<MiQrScreen> {
                                         );
 
                                         final botonDescargar = FilledButton.icon(
-                                          icon: _isLoading
+                                          icon: _isSavingQr
                                               ? SizedBox(
                                                   height: 20,
                                                   width: 20,
@@ -440,9 +527,12 @@ class _MiQrScreenState extends State<MiQrScreen> {
                                                   ),
                                                 )
                                               : const Icon(Icons.download),
-                                          onPressed: (_isLoading || qrInvalido) ? null : () => _descargarQr(s),
+                                          onPressed: (_isSavingQr || qrInvalido) ? null : () => _descargarQr(s),
+                                          style: FilledButton.styleFrom(
+                                            minimumSize: const Size.fromHeight(52),
+                                          ),
                                           label: Text(
-                                            _isLoading ? 'Guardando' : 'Descargar',
+                                            _isSavingQr ? 'Guardando' : 'Descargar',
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
                                             softWrap: false,
@@ -476,23 +566,25 @@ class _MiQrScreenState extends State<MiQrScreen> {
                       },
                     ),
             ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFFFF4200),
-                  foregroundColor: Colors.black,
-                  minimumSize: const Size.fromHeight(52),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+            if (_solicitudes.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFFF4200),
+                    foregroundColor: Colors.black,
+                    minimumSize: const Size.fromHeight(52),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
                   ),
+                  onPressed: _irASolicitar,
+                  icon: const Icon(Icons.add),
+                  label: const Text('Solicitar acceso'),
                 ),
-                onPressed: _irASolicitar,
-                icon: const Icon(Icons.add),
-                label: const Text('Solicitar acceso'),
               ),
-            ),
+            ],
           ],
         ),
       ),

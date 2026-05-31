@@ -1,117 +1,119 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:crypto/crypto.dart';
-import 'dart:convert';
-import 'dart:developer' as dev;
+import '../core/app_log.dart';
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 
+/// Login de propietario contra Cloud Function `loginPropietario`.
+///
+/// Flujo seguro:
+///   1. Llama a la Cloud Function con condominio/casa/password.
+///   2. La función valida (PBKDF2 server-side) y emite un Custom Token.
+///   3. La app firma en Firebase Auth con `signInWithCustomToken`.
+///   4. Todas las llamadas Firestore posteriores se hacen con auth.token
+///      conteniendo `{role: 'propietario', condominio, casaId}` y son
+///      validadas por las reglas Firestore.
 class PropietarioAuthService {
-  static final _db = FirebaseFirestore.instance;
-
-  /// Hash SHA256 con sal — misma implementación que admin_fortguards.
-  static String _hashWithSalt(String password, String salt) {
-    final bytes = utf8.encode('$salt:$password');
-    return sha256.convert(bytes).toString();
-  }
+  static final FirebaseFunctions _functions =
+      FirebaseFunctions.instanceFor(region: 'us-central1');
+  static final FirebaseAuth _auth = FirebaseAuth.instance;
 
   /// Inicia sesión para propietarios.
-  /// Verifica hash con sal. Si encuentra password legacy (plain-text), lo migra automáticamente.
+  ///
+  /// Devuelve `null` si las credenciales son inválidas.
+  /// Lanza si la red falla o si el servidor responde con un error inesperado.
   static Future<Map<String, dynamic>?> loginPropietario({
     required String condominioId,
     required String casaId,
     required String password,
   }) async {
-    final inputCondo = condominioId.trim();
-    final inputCondoLower = inputCondo.toLowerCase();
-    final inputCasaId = casaId.trim();
     try {
-      // Buscar referencia del condominio
-      DocumentReference<Map<String, dynamic>>? condoRef;
+      if (kDebugMode) AppLog.log('🔵 Llamando loginPropietario CF...');
+      final callable = _functions.httpsCallable(
+        'loginPropietario',
+        options: HttpsCallableOptions(timeout: const Duration(seconds: 20)),
+      );
+      final result = await callable.call(<String, dynamic>{
+        'condominio': condominioId.trim(),
+        'casaId': casaId.trim(),
+        'password': password,
+      });
 
-      final directDoc = await _db.collection('condominios').doc(inputCondo).get();
-      if (directDoc.exists) {
-        condoRef = directDoc.reference;
-      } else {
-        // Búsqueda case-insensitive
-        final allCondoSnap = await _db.collection('condominios').get();
-        for (final d in allCondoSnap.docs) {
-          final idLower = d.id.toLowerCase();
-          final nombreLower = (d.data()['nombre'] ?? '').toString().toLowerCase();
-          if (idLower == inputCondoLower || nombreLower == inputCondoLower) {
-            condoRef = d.reference;
-            break;
-          }
-        }
+      if (kDebugMode) AppLog.log('🟢 CF respondió OK');
+
+      final data = result.data as Map?;
+      final token = data?['token'] as String?;
+      if (token == null) {
+        if (kDebugMode) AppLog.log('🔴 Token vacío');
+        return null;
       }
 
-      if (condoRef == null) return null;
-
-      // Buscar casa
-      var casaSnapshot = await condoRef.collection('casas').doc(inputCasaId).get();
-      if (!casaSnapshot.exists) {
-        final altCasaId = int.tryParse(inputCasaId)?.toString();
-        if (altCasaId != null && altCasaId != inputCasaId) {
-          casaSnapshot = await condoRef.collection('casas').doc(altCasaId).get();
-        }
+      if (kDebugMode) {
+        AppLog.log('🔵 Firmando con Custom Token (len=${token.length})...');
       }
+      // Firma en Firebase Auth con Custom Token
+      final cred = await _auth.signInWithCustomToken(token);
+      if (kDebugMode) AppLog.log('🟢 signInWithCustomToken OK uid=${cred.user?.uid}');
 
-      if (!casaSnapshot.exists) return null;
+      final condoIdResp = data!['condominio'] as String;
+      final casaIdResp = data['casaId'] as String;
+      final casaNumero = data['casaNumero'] as int? ?? int.tryParse(casaIdResp);
+      final residentes = (data['residentes'] as List?)?.cast<String>() ?? const [];
 
-      final data = casaSnapshot.data()!;
-      final storedHash = data['passwordHash'] as String?;
-      final storedSalt = data['passwordSalt'] as String?;
-      final storedPlain = data['password'] as String?;
-
-      // 1. Verificar hash con sal
-      if (storedHash != null && storedSalt != null) {
-        if (_hashWithSalt(password, storedSalt) == storedHash) {
-          return _buildResult(casaSnapshot, condoRef.id, data);
-        }
-        return null; // Hash no coincide
+      return {
+        'condominio': condoIdResp,
+        'casa': {
+          'nombre': casaIdResp,
+          'numero': casaNumero,
+        },
+        'codigoCasa': casaIdResp,
+        'personas': residentes,
+        'propietario': data['propietario'] ?? '',
+      };
+    } on FirebaseFunctionsException catch (e) {
+      if (kDebugMode) {
+        AppLog.log('🔴 FunctionsException: code=${e.code} message=${e.message}');
       }
-
-      // 2. Migración legacy: plain-text → hash con sal
-      if (storedPlain != null && storedPlain == password) {
-        final newSalt = _generateSimpleSalt();
-        final hash = _hashWithSalt(password, newSalt);
-
-        await casaSnapshot.reference.update({
-          'passwordHash': hash,
-          'passwordSalt': newSalt,
-          'password': FieldValue.delete(),
-        });
-        dev.log('Propietario migrado a hash: ${condoRef.id} casa ${casaSnapshot.id}');
-
-        return _buildResult(casaSnapshot, condoRef.id, data);
+      if (e.code == 'unauthenticated' || e.code == 'not-found') return null;
+      rethrow;
+    } on FirebaseAuthException catch (e) {
+      if (kDebugMode) {
+        AppLog.log('🔴 AuthException: code=${e.code} message=${e.message}');
       }
-
-      return null;
+      rethrow;
     } catch (e) {
-      dev.log('Error en loginPropietario', error: e);
-      return null;
+      if (kDebugMode) AppLog.log('🔴 loginPropietario error inesperado: $e');
+      rethrow;
     }
   }
 
-  static String _generateSimpleSalt() {
-    final now = DateTime.now();
-    final raw = '${now.microsecondsSinceEpoch}${now.hashCode}';
-    final bytes = utf8.encode(raw);
-    return sha256.convert(bytes).toString().substring(0, 22);
+  /// Cambia la contraseña del propietario autenticado.
+  /// Devuelve `true` si se cambió, `false` si la actual no coincide.
+  static Future<bool> changePassword({
+    required String passwordActual,
+    required String nuevaPassword,
+  }) async {
+    try {
+      final callable = _functions.httpsCallable('changePropietarioPassword');
+      await callable.call(<String, dynamic>{
+        'passwordActual': passwordActual,
+        'nuevaPassword': nuevaPassword,
+      });
+      return true;
+    } on FirebaseFunctionsException catch (e) {
+      if (e.code == 'unauthenticated') return false;
+      rethrow;
+    }
   }
 
-  static Map<String, dynamic> _buildResult(
-    DocumentSnapshot<Map<String, dynamic>> casaDoc,
-    String condominioId,
-    Map<String, dynamic> data,
-  ) {
-    final numero = data['numero'] ?? int.tryParse(casaDoc.id);
-    return {
-      'condominio': condominioId,
-      'casa': {
-        'nombre': casaDoc.id,
-        'numero': numero,
-      },
-      'codigoCasa': casaDoc.id,
-      'personas':
-          (data['residentes'] as List?)?.map((e) => e.toString()).toList() ?? [],
-    };
+  /// Cierra la sesión actual.
+  static Future<void> logout() async {
+    try {
+      await _auth.signOut();
+    } catch (e) {
+      if (kDebugMode) AppLog.log('logout error: $e');
+    }
   }
+
+  /// Usuario auth actual (propietario).
+  static User? get currentUser => _auth.currentUser;
 }

@@ -1,29 +1,44 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-/// Almacenamiento seguro de los datos del visitante (nombre y C.I.) para
-/// reutilizarlos entre sesiones sin volver a pedirlos. Usa
-/// `flutter_secure_storage` (Keychain en iOS / EncryptedSharedPreferences en
-/// Android).
+/// Almacenamiento seguro para datos sensibles.
+/// Usa EncryptedSharedPreferences en Android y Keychain en iOS.
 class SecureStorageService {
-  SecureStorageService._();
+  static const _storage = FlutterSecureStorage(
+    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+  );
 
-  static const FlutterSecureStorage _storage = FlutterSecureStorage();
+  // Keys
+  static const _keyVisitanteCi = 'visitante_ci';
+  static const _keyVisitanteNombre = 'visitante_nombre';
+  static const _keyFcmToken = 'fcm_token';
 
-  static const String _kNombre = 'visitante_nombre';
-  static const String _kCi = 'visitante_ci';
-
-  static Future<String?> getVisitanteNombre() => _storage.read(key: _kNombre);
-
-  static Future<String?> getVisitanteCi() => _storage.read(key: _kCi);
-
-  static Future<void> saveVisitanteNombre(String nombre) =>
-      _storage.write(key: _kNombre, value: nombre);
-
+  // ── Visitante CI ──
   static Future<void> saveVisitanteCi(String ci) =>
-      _storage.write(key: _kCi, value: ci);
+      _storage.write(key: _keyVisitanteCi, value: ci);
 
-  static Future<void> clear() async {
-    await _storage.delete(key: _kNombre);
-    await _storage.delete(key: _kCi);
-  }
+  static Future<String?> getVisitanteCi() =>
+      _storage.read(key: _keyVisitanteCi);
+
+  static Future<void> deleteVisitanteCi() =>
+      _storage.delete(key: _keyVisitanteCi);
+
+  // ── Visitante Nombre ──
+  static Future<void> saveVisitanteNombre(String nombre) =>
+      _storage.write(key: _keyVisitanteNombre, value: nombre);
+
+  static Future<String?> getVisitanteNombre() =>
+      _storage.read(key: _keyVisitanteNombre);
+
+  static Future<void> deleteVisitanteNombre() =>
+      _storage.delete(key: _keyVisitanteNombre);
+
+  // ── FCM Token ──
+  static Future<void> saveFcmToken(String token) =>
+      _storage.write(key: _keyFcmToken, value: token);
+
+  static Future<String?> getFcmToken() =>
+      _storage.read(key: _keyFcmToken);
+
+  // ── Limpieza ──
+  static Future<void> clearAll() => _storage.deleteAll();
 }

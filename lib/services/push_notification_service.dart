@@ -1,9 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// GlobalKey para acceder al Navigator desde servicios
 /// Debe asignarse en MaterialApp: navigatorKey: PushNotificationService.navigatorKey
@@ -12,7 +14,7 @@ final GlobalKey<NavigatorState> globalNavigatorKey = GlobalKey<NavigatorState>()
 // Handler para mensajes en background (debe estar fuera de cualquier clase)
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  debugPrint('📩 Background message: ${message.messageId}');
+  if (kDebugMode) debugPrint('📩 Background message: ${message.messageId}');
   
   // Procesar mensaje según tipo
   final data = message.data;
@@ -199,14 +201,14 @@ class PushNotificationService {
       criticalAlert: false,
     );
     
-    debugPrint('📱 Permisos de notificación: ${settings.authorizationStatus}');
+    if (kDebugMode) debugPrint('📱 Permisos de notificación: ${settings.authorizationStatus}');
     
     if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-      debugPrint('✅ Usuario autorizó notificaciones');
+      if (kDebugMode) debugPrint('✅ Usuario autorizó notificaciones');
     } else if (settings.authorizationStatus == AuthorizationStatus.provisional) {
-      debugPrint('⚠️ Usuario autorizó notificaciones provisionales');
+      if (kDebugMode) debugPrint('⚠️ Usuario autorizó notificaciones provisionales');
     } else {
-      debugPrint('❌ Usuario rechazó notificaciones');
+      if (kDebugMode) debugPrint('❌ Usuario rechazó notificaciones');
     }
   }
   
@@ -214,13 +216,13 @@ class PushNotificationService {
   void _setupForegroundListeners() {
     // Mensajes cuando la app está abierta
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      debugPrint('📨 Foreground message: ${message.messageId}');
+      if (kDebugMode) debugPrint('📨 Foreground message: ${message.messageId}');
       _handleForegroundMessage(message);
     });
     
     // Cuando el usuario toca una notificación y la app se abre
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      debugPrint('📬 Message opened app: ${message.messageId}');
+      if (kDebugMode) debugPrint('📬 Message opened app: ${message.messageId}');
       _handleMessageOpenedApp(message);
     });
     
@@ -401,7 +403,7 @@ class PushNotificationService {
           break;
       }
     } catch (e) {
-      debugPrint('Error parsing notification payload: $e');
+      if (kDebugMode) debugPrint('Error parsing notification payload: $e');
     }
   }
   
@@ -429,12 +431,12 @@ class PushNotificationService {
         if (_condominio != null) {
           // Topic del condominio para avisos generales
           await _fcm.subscribeToTopic('condo_$_condominio');
-          debugPrint('📢 Suscrito a: condo_$_condominio');
+          if (kDebugMode) debugPrint('📢 Suscrito a: condo_$_condominio');
           
           if (_casaNumero != null) {
             // Topic específico del propietario
             await _fcm.subscribeToTopic('prop_${_condominio}_$_casaNumero');
-            debugPrint('📢 Suscrito a: prop_${_condominio}_$_casaNumero');
+            if (kDebugMode) debugPrint('Suscrito a: prop_${_condominio}_$_casaNumero');
           }
         }
         break;
@@ -443,7 +445,7 @@ class PushNotificationService {
         if (_condominio != null) {
           // Topic del condominio para guardias
           await _fcm.subscribeToTopic('guardia_$_condominio');
-          debugPrint('📢 Suscrito a: guardia_$_condominio');
+          if (kDebugMode) debugPrint('📢 Suscrito a: guardia_$_condominio');
         }
         break;
         
@@ -451,14 +453,14 @@ class PushNotificationService {
         if (_qrCodigo != null) {
           // Topic del QR específico
           await _fcm.subscribeToTopic('qr_$_qrCodigo');
-          debugPrint('📢 Suscrito a: qr_$_qrCodigo');
+          if (kDebugMode) debugPrint('📢 Suscrito a: qr_$_qrCodigo');
         }
         break;
     }
     
     // Topic global para todos los usuarios
     await _fcm.subscribeToTopic('all_users');
-    debugPrint('📢 Suscrito a: all_users');
+    if (kDebugMode) debugPrint('📢 Suscrito a: all_users');
   }
   
   // Desuscribirse de todos los topics
@@ -468,7 +470,7 @@ class PushNotificationService {
     
     for (final topic in previousTopics) {
       await _fcm.unsubscribeFromTopic(topic);
-      debugPrint('🔕 Desuscrito de: $topic');
+      if (kDebugMode) debugPrint('🔕 Desuscrito de: $topic');
     }
     
     await prefs.remove('subscribed_topics');
@@ -486,13 +488,20 @@ class PushNotificationService {
   Future<void> _updateToken(String token) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('fcm_token', token);
-    debugPrint('🔑 FCM Token: $token');
-    
-    // TODO: Guardar token en Firestore para el usuario actual
-    // await FirebaseFirestore.instance
-    //     .collection('users')
-    //     .doc(userId)
-    //     .update({'fcmToken': token});
+
+    // Persistir token en Firestore para poder enviar push desde el servidor
+    if (_condominio != null && _casaNumero != null && _currentRole == 'propietario') {
+      try {
+        await FirebaseFirestore.instance
+            .collection('condominios')
+            .doc(_condominio!)
+            .collection('casas')
+            .doc(_casaNumero.toString())
+            .update({'fcmToken': token, 'fcmTokenUpdatedAt': FieldValue.serverTimestamp()});
+      } catch (e) {
+        if (kDebugMode) debugPrint('Error guardando FCM token en Firestore: $e');
+      }
+    }
   }
   
   // Actualizar suscripciones cuando cambia el rol o datos

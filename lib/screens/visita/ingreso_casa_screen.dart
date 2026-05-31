@@ -6,6 +6,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/codigo_casa_util.dart';
 import '../../widgets/back_handler.dart';
 import '../../services/secure_storage_service.dart';
+import '../../services/qr_local_service.dart';
+import '../../models/qr_local_model.dart';
 
 class IngresoCasaScreen extends StatefulWidget {
   final int casaNumero;
@@ -90,6 +92,32 @@ class _IngresoCasaScreenState extends State<IngresoCasaScreen> {
         } catch (e) {
           // Silencioso, no bloquear el flujo
         }
+      }
+
+      // Persistir el QR localmente para que aparezca en "Mis QRs".
+      // Leemos el doc de la casa para conocer la expiración y usos vigentes.
+      try {
+        final casaDoc = await FirebaseFirestore.instance
+            .collection('condominios')
+            .doc(widget.condominio)
+            .collection('casas')
+            .doc(widget.casaNumero.toString())
+            .get();
+        final data = casaDoc.data();
+        final expiraTs = data?['codigoExpira'] as Timestamp?;
+        final usosRestantes = data?['codigoUsos'] as int? ?? 1;
+
+        await QrLocalService.save(QrLocalModel(
+          codigo: _codigoController.text.trim(),
+          condominio: widget.condominio,
+          casa: widget.casaNumero,
+          expira: expiraTs?.toDate() ?? DateTime.now().add(const Duration(hours: 24)),
+          usosRestantes: usosRestantes,
+          propietarioId: ci != null ? 'visitante_$ci' : null,
+          propietarioNombre: nombre,
+        ));
+      } catch (e) {
+        // No bloqueamos el flujo si la persistencia local falla
       }
 
       _mostrarQR();

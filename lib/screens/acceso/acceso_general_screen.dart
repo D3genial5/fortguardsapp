@@ -24,32 +24,32 @@ class AccesoGeneralScreen extends StatelessWidget {
           ),
         ),
       ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final screenWidth = constraints.maxWidth;
-          final screenHeight = constraints.maxHeight;
-          
-          // Calcular tamaño óptimo de botones
-          final horizontalPadding = 32.0;
-          final buttonGap = 16.0;
-          final rawButtonWidth = (screenWidth - (horizontalPadding * 2) - buttonGap) / 2;
-          final buttonWidth = rawButtonWidth.clamp(120.0, 180.0);
-          final buttonHeight = (buttonWidth * 1.35).clamp(162.0, 240.0);
-          final logoSize = (screenWidth * 0.42).clamp(120.0, 162.0);
-          
-          // Calcular altura total necesaria
-          final totalHeight = (buttonHeight * 2) + buttonGap;
-          final topPadding = (screenHeight - totalHeight) / 2;
-          
-          return SingleChildScrollView(
-            child: Padding(
-              padding: EdgeInsets.only(
-                left: horizontalPadding,
-                right: horizontalPadding,
-                top: topPadding.clamp(40, double.infinity),
-                bottom: 40,
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final screenWidth = constraints.maxWidth;
+            final screenHeight = constraints.maxHeight;
+            final isNarrow = screenWidth < 360;
+
+            // Calcular tamaño óptimo de botones
+            final horizontalPadding = isNarrow ? 12.0 : 24.0;
+            final buttonGap = isNarrow ? 10.0 : 16.0;
+            final rawButtonWidth = (screenWidth - (horizontalPadding * 2) - buttonGap) / 2;
+            final buttonWidth = rawButtonWidth.clamp(98.0, 180.0);
+            final buttonHeight = (buttonWidth * 1.35).clamp(142.0, 240.0);
+            final logoSize = (screenWidth * 0.34).clamp(96.0, 162.0);
+
+            return SingleChildScrollView(
+              padding: EdgeInsets.symmetric(
+                horizontal: horizontalPadding,
+                vertical: 12.0,
               ),
-              child: Stack(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: screenHeight - 24.0, // minus vertical padding
+                ),
+                child: Center(
+                  child: Stack(
                 children: [
                   // Grid 2x2
                   Column(
@@ -134,8 +134,10 @@ class AccesoGeneralScreen extends StatelessWidget {
                 ],
               ),
             ),
-          );
-        },
+              ),
+            );
+          },
+        ),
       ),
       ),
     );
@@ -249,6 +251,8 @@ class _AnimatedGridButtonState extends State<_AnimatedGridButton>
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final iconSize = (widget.height * 0.34).clamp(40.0, 56.0);
+    final iconLabelGap = (widget.height * 0.08).clamp(10.0, 16.0);
     
     return ScaleTransition(
       scale: _scaleAnimation,
@@ -314,9 +318,9 @@ class _AnimatedGridButtonState extends State<_AnimatedGridButton>
                 Icon(
                   widget.icon,
                   color: Colors.black,
-                  size: 56,
+                  size: iconSize,
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: iconLabelGap),
                 Text(
                   widget.label,
                   style: const TextStyle(
@@ -327,8 +331,9 @@ class _AnimatedGridButtonState extends State<_AnimatedGridButton>
                     height: 1.2,
                   ),
                   textAlign: TextAlign.center,
-                  maxLines: 2,
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
+                  softWrap: false,
                 ),
               ],
             ),

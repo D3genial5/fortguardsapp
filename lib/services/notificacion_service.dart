@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'dart:developer' as dev;
+import '../core/app_log.dart';
 
 import '../models/notificacion_model.dart';
 
@@ -26,19 +26,19 @@ class NotificacionService {
         provisional: false,
       );
       
-      dev.log('📱 Permiso de notificaciones: ${settings.authorizationStatus}', name: 'NotificacionService');
+      AppLog.log('📱 Permiso de notificaciones: ${settings.authorizationStatus}', name: 'NotificacionService');
       
       if (settings.authorizationStatus == AuthorizationStatus.authorized ||
           settings.authorizationStatus == AuthorizationStatus.provisional) {
         
         // Obtener y guardar el token FCM
         _fcmToken = await messaging.getToken();
-        dev.log('🔑 FCM Token: $_fcmToken', name: 'NotificacionService');
+        AppLog.log('🔑 FCM Token: $_fcmToken', name: 'NotificacionService');
         
         // Escuchar cambios de token
         messaging.onTokenRefresh.listen((newToken) {
           _fcmToken = newToken;
-          dev.log('🔄 FCM Token actualizado: $newToken', name: 'NotificacionService');
+          AppLog.log('🔄 FCM Token actualizado: $newToken', name: 'NotificacionService');
         });
       }
       
@@ -73,9 +73,9 @@ class NotificacionService {
       FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
       FirebaseMessaging.onMessageOpenedApp.listen(_handleMessageOpenedApp);
       
-      dev.log('✅ Servicio de notificaciones inicializado', name: 'NotificacionService');
+      AppLog.log('✅ Servicio de notificaciones inicializado', name: 'NotificacionService');
     } catch (e) {
-      dev.log('❌ Error al inicializar notificaciones: $e', name: 'NotificacionService');
+      AppLog.log('❌ Error al inicializar notificaciones: $e', name: 'NotificacionService');
     }
   }
   
@@ -96,9 +96,9 @@ class NotificacionService {
         'fcmToken': _fcmToken,
         'fcmTokenUpdated': FieldValue.serverTimestamp(),
       });
-      dev.log('✅ Token FCM guardado para casa $casaNumero', name: 'NotificacionService');
+      AppLog.log('✅ Token FCM guardado para casa $casaNumero', name: 'NotificacionService');
     } catch (e) {
-      dev.log('⚠️ Error guardando token FCM: $e', name: 'NotificacionService');
+      AppLog.log('⚠️ Error guardando token FCM: $e', name: 'NotificacionService');
     }
   }
   
@@ -112,14 +112,14 @@ class NotificacionService {
       
       // Suscribirse al tópico del condominio (notificaciones generales)
       await messaging.subscribeToTopic('condo_$condominio');
-      dev.log('✅ Suscrito a tópico: condo_$condominio', name: 'NotificacionService');
+      AppLog.log('✅ Suscrito a tópico: condo_$condominio', name: 'NotificacionService');
       
       // Suscribirse al tópico específico de la casa
       await messaging.subscribeToTopic('prop_${condominio}_$casaNumero');
-      dev.log('✅ Suscrito a tópico: prop_${condominio}_$casaNumero', name: 'NotificacionService');
+      AppLog.log('✅ Suscrito a tópico: prop_${condominio}_$casaNumero', name: 'NotificacionService');
       
     } catch (e) {
-      dev.log('⚠️ Error suscribiéndose a tópicos: $e', name: 'NotificacionService');
+      AppLog.log('⚠️ Error suscribiéndose a tópicos: $e', name: 'NotificacionService');
     }
   }
   
@@ -134,9 +134,9 @@ class NotificacionService {
       await messaging.unsubscribeFromTopic('condo_$condominio');
       await messaging.unsubscribeFromTopic('prop_${condominio}_$casaNumero');
       
-      dev.log('✅ Desuscrito de tópicos de $condominio', name: 'NotificacionService');
+      AppLog.log('✅ Desuscrito de tópicos de $condominio', name: 'NotificacionService');
     } catch (e) {
-      dev.log('⚠️ Error desuscribiéndose de tópicos: $e', name: 'NotificacionService');
+      AppLog.log('⚠️ Error desuscribiéndose de tópicos: $e', name: 'NotificacionService');
     }
   }
   
@@ -175,19 +175,19 @@ class NotificacionService {
         payload: payload,
       );
     } catch (e) {
-      dev.log('❌ Error mostrando notificación: $e', name: 'NotificacionService');
+      AppLog.log('❌ Error mostrando notificación: $e', name: 'NotificacionService');
     }
   }
   
   // Manejar mensajes en primer plano
   static void _handleForegroundMessage(RemoteMessage message) {
-    dev.log('📱 Mensaje recibido en primer plano: ${message.notification?.title}', name: 'NotificacionService');
+    AppLog.log('📱 Mensaje recibido en primer plano: ${message.notification?.title}', name: 'NotificacionService');
     _mostrarNotificacionLocal(message);
   }
   
   // Manejar cuando la app se abre desde una notificación
   static void _handleMessageOpenedApp(RemoteMessage message) {
-    dev.log('🔓 App abierta desde notificación: ${message.notification?.title}', name: 'NotificacionService');
+    AppLog.log('🔓 App abierta desde notificación: ${message.notification?.title}', name: 'NotificacionService');
   }
   
   // Mostrar notificación local
@@ -221,7 +221,7 @@ class NotificacionService {
         payload: message.data.toString(),
       );
     } catch (e) {
-      dev.log('❌ Error al mostrar notificación local: $e', name: 'NotificacionService');
+      AppLog.log('❌ Error al mostrar notificación local: $e', name: 'NotificacionService');
     }
   }
 
@@ -259,9 +259,19 @@ class NotificacionService {
   }
   
   // ============ LISTENER PARA PUSH NOTIFICATIONS EN TIEMPO REAL ============
-  
+
   static StreamSubscription? _notificacionesSubscription;
-  static final Set<String> _notificacionesMostradas = {};
+  // Acotamos para que el Set no crezca sin tope durante sesiones largas.
+  static const int _maxMostradas = 200;
+  static final Set<String> _notificacionesMostradas = <String>{};
+
+  static void _trackMostrada(String id) {
+    _notificacionesMostradas.add(id);
+    if (_notificacionesMostradas.length > _maxMostradas) {
+      // Drop el más viejo (Set mantiene insertion order desde Dart 2.0+)
+      _notificacionesMostradas.remove(_notificacionesMostradas.first);
+    }
+  }
   
   /// Iniciar escucha de notificaciones nuevas para mostrar como push
   static void escucharNotificaciones({
@@ -272,7 +282,7 @@ class NotificacionService {
     _notificacionesSubscription?.cancel();
     _notificacionesMostradas.clear();
     
-    dev.log('🔔 Iniciando escucha de notificaciones para $condominioId', name: 'NotificacionService');
+    AppLog.log('🔔 Iniciando escucha de notificaciones para $condominioId', name: 'NotificacionService');
     var esPrimerSnapshot = true;
     
     // Escuchar notificaciones del condominio (tipo: 'condominio' o casaNumero: 0)
@@ -303,7 +313,7 @@ class NotificacionService {
           
           // Evitar mostrar la misma notificación múltiples veces
           if (_notificacionesMostradas.contains(docId)) continue;
-          _notificacionesMostradas.add(docId);
+          _trackMostrada(docId);
           
           // Verificar si es para todo el condominio o para esta casa específica
           final tipo = data['tipo'] as String?;
@@ -319,7 +329,7 @@ class NotificacionService {
             
             // Solo mostrar si no ha sido vista
             if (!visto) {
-              dev.log('📬 Nueva notificación: $titulo', name: 'NotificacionService');
+              AppLog.log('📬 Nueva notificación: $titulo', name: 'NotificacionService');
               mostrarNotificacion(
                 titulo: titulo,
                 cuerpo: mensaje,
@@ -330,7 +340,7 @@ class NotificacionService {
         }
       }
     }, onError: (e) {
-      dev.log('❌ Error escuchando notificaciones: $e', name: 'NotificacionService');
+      AppLog.log('❌ Error escuchando notificaciones: $e', name: 'NotificacionService');
     });
   }
   
@@ -339,6 +349,6 @@ class NotificacionService {
     _notificacionesSubscription?.cancel();
     _notificacionesSubscription = null;
     _notificacionesMostradas.clear();
-    dev.log('🔕 Escucha de notificaciones detenida', name: 'NotificacionService');
+    AppLog.log('🔕 Escucha de notificaciones detenida', name: 'NotificacionService');
   }
 }

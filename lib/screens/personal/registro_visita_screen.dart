@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../widgets/back_handler.dart';
 import '../../services/ocr_service.dart';
@@ -326,7 +327,33 @@ class _RegistroVisitaScreenState extends State<RegistroVisitaScreen>
         urlPlaca = await _subirFoto(_fotoPlaca!, 'placa');
       }
 
-      // Guardar en Firestore
+      // ----------------------------------------------------------------
+      // 1) Persistencia local SIEMPRE — funciona aunque Firestore falle
+      // ----------------------------------------------------------------
+      await SecureStorageService.saveVisitanteNombre(nombre);
+      await SecureStorageService.saveVisitanteCi(ci);
+      final prefs = await SharedPreferences.getInstance();
+      if (placa.isNotEmpty) {
+        await prefs.setString('visitante_placa', placa);
+      }
+      await prefs.setBool('visitante_registrado', true);
+      await prefs.setBool('visitante_esExtranjero', _esExtranjero);
+      if (urlCarnetFrente != null) await prefs.setString('visitante_carnetFrenteUrl', urlCarnetFrente);
+      if (urlCarnetReverso != null) await prefs.setString('visitante_carnetReversoUrl', urlCarnetReverso);
+      if (urlPlaca != null) await prefs.setString('visitante_placaUrl', urlPlaca);
+
+      // ----------------------------------------------------------------
+      // 2) Subir a Firestore — requiere auth.uid (anon o propietario)
+      //    Si por algún motivo no hay user, intentamos anon ahora mismo.
+      // ----------------------------------------------------------------
+      if (FirebaseAuth.instance.currentUser == null) {
+        try {
+          await FirebaseAuth.instance.signInAnonymously();
+        } catch (e) {
+          if (kDebugMode) debugPrint('Anon auth en save falló: $e');
+        }
+      }
+      final uid = FirebaseAuth.instance.currentUser?.uid;
       final visitanteData = {
         'nombre': nombre,
         'ci': ci,
@@ -339,22 +366,20 @@ class _RegistroVisitaScreenState extends State<RegistroVisitaScreen>
         'esExtranjero': _esExtranjero,
         'fechaRegistro': FieldValue.serverTimestamp(),
         'activo': true,
+        if (uid != null) 'creatorUid': uid,
       };
 
-      await FirebaseFirestore.instance
-          .collection('visitantes')
-          .doc(ci)
-          .set(visitanteData, SetOptions(merge: true));
-
-      // Guardar datos sensibles en almacenamiento seguro
-      await SecureStorageService.saveVisitanteNombre(nombre);
-      await SecureStorageService.saveVisitanteCi(ci);
-      // Datos no sensibles en SharedPreferences
-      final prefs = await SharedPreferences.getInstance();
-      if (placa.isNotEmpty) {
-        await prefs.setString('visitante_placa', placa);
+      try {
+        await FirebaseFirestore.instance
+            .collection('visitantes')
+            .doc(ci)
+            .set(visitanteData, SetOptions(merge: true));
+      } on FirebaseException catch (e) {
+        // No bloqueamos el flujo si Firestore falla: la data local ya está
+        // guardada; el upload se reintentará la próxima vez que el visitante
+        // entre a un condominio.
+        if (kDebugMode) debugPrint('Firestore visitante write falló: ${e.code} ${e.message}');
       }
-      await prefs.setBool('visitante_registrado', true);
 
       if (!mounted) return;
 

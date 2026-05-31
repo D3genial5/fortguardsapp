@@ -86,11 +86,23 @@ class _SeleccionAccionScreenState extends State<SeleccionAccionScreen>
         ),
         body: _cargando 
           ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
+          : SafeArea(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final sidePadding = constraints.maxWidth < 380 ? 12.0 : 20.0;
+
+                  return SingleChildScrollView(
+                    padding: EdgeInsets.all(sidePadding),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: constraints.maxHeight - (sidePadding * 2),
+                      ),
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 520),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
                   // Card de Entrada
                   _buildOptionCard(
                     context,
@@ -181,7 +193,13 @@ class _SeleccionAccionScreenState extends State<SeleccionAccionScreen>
                       ),
                     ),
                   ],
-                ],
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
       ),
@@ -260,6 +278,9 @@ class _SeleccionAccionScreenState extends State<SeleccionAccionScreen>
                     children: [
                       Text(
                         title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        softWrap: false,
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -269,6 +290,8 @@ class _SeleccionAccionScreenState extends State<SeleccionAccionScreen>
                       const SizedBox(height: 4),
                       Text(
                         subtitle,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 13,
                           color: scheme.onSurface.withValues(alpha: 0.6),

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -16,39 +16,29 @@ class NotificationService {
   
   String? _currentToken;
   String? _currentUserId;
-  
-  // Inicializar servicio de notificaciones
-  Future<void> initialize(
-    String userId, {
-    String? condominioId,
-    int? casaNumero,
-  }) async {
-    _currentUserId = userId;
+  String? _condominioId;
+  int? _casaNumero;
 
+  // Inicializar servicio de notificaciones
+  Future<void> initialize(String userId, {String? condominioId, int? casaNumero}) async {
+    _currentUserId = userId;
+    _condominioId = condominioId;
+    _casaNumero = casaNumero;
+    
     // Configurar listeners de FCM primero (síncrono)
     _configureFCMListeners();
-
+    
     // Escuchar cambios de token
     _fcm.onTokenRefresh.listen(_saveToken);
-
+    
     // Solicitar permisos
     await _requestPermissions();
-
+    
     // Configurar notificaciones locales
     await _configureLocalNotifications();
-
+    
     // Obtener y guardar token FCM
     await _getAndSaveToken();
-
-    // Suscribir al topic privado de la casa (notificaciones del propietario),
-    // alineado con el naming usado por las Cloud Functions: prop_{condo}_{casa}.
-    if (condominioId != null && casaNumero != null) {
-      try {
-        await _fcm.subscribeToTopic('prop_${condominioId}_$casaNumero');
-      } catch (e) {
-        debugPrint('Error suscribiendo a topic de casa: $e');
-      }
-    }
   }
   
   // Solicitar permisos de notificaciones
@@ -60,7 +50,7 @@ class NotificationService {
       provisional: false,
     );
     
-    debugPrint('Permisos de notificación: ${settings.authorizationStatus}');
+    if (kDebugMode) debugPrint('Permisos de notificación: ${settings.authorizationStatus}');
   }
   
   // Configurar notificaciones locales
@@ -103,24 +93,26 @@ class NotificationService {
         await _saveToken(_currentToken!);
       }
     } catch (e) {
-      debugPrint('Error obteniendo token FCM: $e');
+      if (kDebugMode) debugPrint('Error obteniendo token FCM: $e');
     }
   }
   
-  // Guardar token en Firestore
+  // Guardar token en Firestore (en el documento de la casa del propietario)
   Future<void> _saveToken(String token) async {
     try {
-      if (_currentUserId == null) return;
-      
-      // Actualizar tokens FCM en credenciales
-      await _firestore.collection('credenciales').doc(_currentUserId).update({
-        'fcmTokens': FieldValue.arrayUnion([token]),
-        'ultimoLoginAt': FieldValue.serverTimestamp(),
+      if (_condominioId == null || _casaNumero == null) return;
+
+      await _firestore
+          .collection('condominios')
+          .doc(_condominioId!)
+          .collection('casas')
+          .doc(_casaNumero.toString())
+          .update({
+        'fcmToken': token,
+        'fcmTokenUpdatedAt': FieldValue.serverTimestamp(),
       });
-      
-      debugPrint('Token FCM guardado: $token');
     } catch (e) {
-      debugPrint('Error guardando token FCM: $e');
+      if (kDebugMode) debugPrint('Error guardando token FCM: $e');
     }
   }
   
@@ -215,7 +207,7 @@ class NotificationService {
         'creadoAt': FieldValue.serverTimestamp(),
       });
     } catch (e) {
-      debugPrint('Error guardando notificación: $e');
+      if (kDebugMode) debugPrint('Error guardando notificación: $e');
     }
   }
   
@@ -272,7 +264,7 @@ class NotificationService {
         'leida': true,
       });
     } catch (e) {
-      debugPrint('Error marcando notificación como leída: $e');
+      if (kDebugMode) debugPrint('Error marcando notificación como leída: $e');
     }
   }
   
@@ -280,9 +272,9 @@ class NotificationService {
   Future<void> subscribeToCondominio(String condominioId) async {
     try {
       await _fcm.subscribeToTopic('condominio_$condominioId');
-      debugPrint('Suscrito al topic: condominio_$condominioId');
+      if (kDebugMode) debugPrint('Suscrito al topic: condominio_$condominioId');
     } catch (e) {
-      debugPrint('Error suscribiendo a topic: $e');
+      if (kDebugMode) debugPrint('Error suscribiendo a topic: $e');
     }
   }
   
@@ -290,9 +282,9 @@ class NotificationService {
   Future<void> unsubscribeFromCondominio(String condominioId) async {
     try {
       await _fcm.unsubscribeFromTopic('condominio_$condominioId');
-      debugPrint('Desuscrito del topic: condominio_$condominioId');
+      if (kDebugMode) debugPrint('Desuscrito del topic: condominio_$condominioId');
     } catch (e) {
-      debugPrint('Error desuscribiendo de topic: $e');
+      if (kDebugMode) debugPrint('Error desuscribiendo de topic: $e');
     }
   }
   
@@ -316,6 +308,6 @@ class NotificationService {
 // Handler para mensajes en background
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  debugPrint('Mensaje en background: ${message.messageId}');
+  if (kDebugMode) debugPrint('Mensaje en background: ${message.messageId}');
   // Aquí se puede procesar el mensaje en background si es necesario
 }

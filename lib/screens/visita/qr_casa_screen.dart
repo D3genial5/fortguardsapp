@@ -6,6 +6,8 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../widgets/back_handler.dart';
+import '../../widgets/secure_screen.dart';
+import '../../services/secure_storage_service.dart';
 
 class QrCasaScreen extends StatefulWidget {
   final String casa;
@@ -119,9 +121,8 @@ class _QrCasaScreenState extends State<QrCasaScreen> {
   }
 
   Future<void> _cargarVisitanteLocal() async {
-    final prefs = await SharedPreferences.getInstance();
-    final nombre = prefs.getString('visitante_nombre');
-    final ci = prefs.getString('visitante_ci');
+    final nombre = await SecureStorageService.getVisitanteNombre();
+    final ci = await SecureStorageService.getVisitanteCi();
     if (!mounted) return;
     setState(() {
       _visitanteNombre = nombre;
@@ -165,8 +166,7 @@ class _QrCasaScreenState extends State<QrCasaScreen> {
       }
       
       // Fallback: buscar en Firestore si no se pasaron datos
-      final prefs = await SharedPreferences.getInstance();
-      final ci = prefs.getString('visitante_ci');
+      final ci = await SecureStorageService.getVisitanteCi();
       
       // Buscar la solicitud aprobada para este visitante, condominio y casa
       final casaNumMatch = RegExp(r'(\d+)').firstMatch(widget.casa);
@@ -381,12 +381,17 @@ class _QrCasaScreenState extends State<QrCasaScreen> {
               children: [
                 Icon(icon, color: color, size: 28),
                 const SizedBox(width: 8),
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: color,
+                Flexible(
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    softWrap: false,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: color,
+                    ),
                   ),
                 ),
               ],
@@ -480,196 +485,245 @@ class _QrCasaScreenState extends State<QrCasaScreen> {
     final qrData = _buildQrDataWithSession(esEntrada: !esSalida);
     final qrInvalido = !esSalida && _qrInvalido;
 
-    return BackHandler(
-      onBackPressed: _volver,
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(esSalida ? 'QR de Salida' : 'QR de Entrada'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: _volver,
+    return SecureScreen(
+      child: BackHandler(
+        onBackPressed: _volver,
+        child: Scaffold(
+          appBar: AppBar(
+            title: Text(esSalida ? 'QR de Salida' : 'QR de Entrada'),
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: _volver,
+            ),
           ),
-        ),
-        body: SafeArea(
-        child: _isLoading || _sessionId == null || !_visitanteLoaded
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-            ? Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
-                      const SizedBox(height: 16),
-                      Text(_error!, textAlign: TextAlign.center),
-                      const SizedBox(height: 24),
-                      FilledButton(
-                        onPressed: () => context.go('/seleccion-accion'),
-                        child: const Text('Volver'),
-                      ),
-                    ],
-                  ),
-                ),
-              )
-            : (_visitanteNombre == null || _visitanteCi == null)
+          body: SafeArea(
+          child: _isLoading || _sessionId == null || !_visitanteLoaded
+            ? const Center(child: CircularProgressIndicator())
+            : _error != null
               ? Center(
                   child: Padding(
                     padding: const EdgeInsets.all(24),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.person_off_outlined, size: 64, color: Colors.red[300]),
+                        Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
                         const SizedBox(height: 16),
-                        const Text(
-                          'Completa tu registro de visitante para generar el QR.',
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 16),
+                        Text(_error!, textAlign: TextAlign.center),
+                        const SizedBox(height: 24),
                         FilledButton(
-                          onPressed: () => context.go('/registro-visita'),
-                          child: const Text('Ir a Registro'),
+                          onPressed: () => context.go('/seleccion-accion'),
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size.fromHeight(52),
+                          ),
+                          child: const Text(
+                            'Volver',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            softWrap: false,
+                          ),
                         ),
                       ],
                     ),
                   ),
                 )
-            : LayoutBuilder(
-          builder: (context, constraints) {
-            final maxQrSize = (constraints.maxWidth - 100).clamp(150.0, 200.0);
-            return SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 500),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // QR seleccionado (Entrada o Salida)
-                      qrInvalido
-                          ? _buildQrInvalidoCard()
-                          : _buildQrCard(
-                              context: context,
-                              title: qrTitle,
-                              icon: qrIcon,
-                              color: qrColor,
-                              qrData: qrData,
-                              qrSize: maxQrSize,
+              : (_visitanteNombre == null || _visitanteCi == null)
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.person_off_outlined, size: 64, color: Colors.red[300]),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Completa tu registro de visitante para generar el QR.',
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 16),
+                          FilledButton(
+                            onPressed: () => context.go('/registro-visita'),
+                            style: FilledButton.styleFrom(
+                              minimumSize: const Size.fromHeight(52),
                             ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Casa: ${widget.casa}',
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                      Text(
-                        'Condominio: ${widget.condominio}',
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                      if (_codigoQr != null) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          'Código: $_codigoQr',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                            fontFamily: 'monospace',
+                            child: const Text(
+                              'Ir a Registro',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              softWrap: false,
+                            ),
                           ),
-                        ),
-                      ],
-                      const SizedBox(height: 24),
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: Colors.blue.withValues(alpha: 0.3),
-                            width: 1,
-                          ),
-                        ),
-                        child: Column(
-                          children: [
-                            const Text(
-                              'Información del QR',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
+                        ],
+                      ),
+                    ),
+                  )
+              : LayoutBuilder(
+            builder: (context, constraints) {
+              final maxQrSize = (constraints.maxWidth - 80).clamp(150.0, 200.0);
+              return SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 500),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // QR seleccionado (Entrada o Salida)
+                        qrInvalido
+                            ? _buildQrInvalidoCard()
+                            : _buildQrCard(
+                                context: context,
+                                title: qrTitle,
+                                icon: qrIcon,
+                                color: qrColor,
+                                qrData: qrData,
+                                qrSize: maxQrSize,
                               ),
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                              children: [
-                                Column(
-                                  children: [
-                                    Icon(Icons.schedule, color: Colors.blue[700]),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      _tipoAcceso == 'tiempo' ? 'Expira' : 'Tipo',
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.grey,
-                                      ),
-                                    ),
-                                    Text(
-                                      _tipoAcceso == 'tiempo' && _fechaExpiracion != null
-                                          ? _formatearFecha(_fechaExpiracion!)
-                                          : _tipoAcceso == 'indefinido' 
-                                              ? 'Indefinido'
-                                              : 'Por usos',
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                Container(
-                                  height: 40,
-                                  width: 1,
-                                  color: Colors.grey[300],
-                                ),
-                                Column(
-                                  children: [
-                                    Icon(Icons.repeat, color: Colors.blue[700]),
-                                    const SizedBox(height: 4),
-                                    const Text(
-                                      'Usos',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.grey,
-                                      ),
-                                    ),
-                                    Text(
-                                      _tipoAcceso == 'indefinido'
-                                          ? '∞'
-                                          : '${_usosRestantes ?? 0}',
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ],
+                        const SizedBox(height: 16),
+                        Text(
+                          'Casa: ${widget.casa}',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodyMedium,
                         ),
-                      ),
-                      const SizedBox(height: 20),
-                      // Mensaje informativo
-                    ],
+                        Text(
+                          'Condominio: ${widget.condominio}',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        if (_codigoQr != null) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            'Código: $_codigoQr',
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                              fontFamily: 'monospace',
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 24),
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.blue.withValues(alpha: 0.3),
+                              width: 1,
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              const Text(
+                                'Información del QR',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              LayoutBuilder(
+                                builder: (context, infoConstraints) {
+                                  final usarColumna = infoConstraints.maxWidth < 360;
+
+                                  final bloqueTipo = Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.schedule, color: Colors.blue[700]),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        _tipoAcceso == 'tiempo' ? 'Expira' : 'Tipo',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey,
+                                        ),
+                                      ),
+                                      Text(
+                                        _tipoAcceso == 'tiempo' && _fechaExpiracion != null
+                                            ? _formatearFecha(_fechaExpiracion!)
+                                            : _tipoAcceso == 'indefinido'
+                                                ? 'Indefinido'
+                                                : 'Por usos',
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  );
+
+                                  final bloqueUsos = Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.repeat, color: Colors.blue[700]),
+                                      const SizedBox(height: 4),
+                                      const Text(
+                                        'Usos',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey,
+                                        ),
+                                      ),
+                                      Text(
+                                        _tipoAcceso == 'indefinido'
+                                            ? '∞'
+                                            : '${_usosRestantes ?? 0}',
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  );
+
+                                  if (usarColumna) {
+                                    return Column(
+                                      children: [
+                                        bloqueTipo,
+                                        const SizedBox(height: 12),
+                                        Container(
+                                          height: 1,
+                                          width: 56,
+                                          color: Colors.grey[300],
+                                        ),
+                                        const SizedBox(height: 12),
+                                        bloqueUsos,
+                                      ],
+                                    );
+                                  }
+
+                                  return Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                    children: [
+                                      bloqueTipo,
+                                      Container(
+                                        height: 40,
+                                        width: 1,
+                                        color: Colors.grey[300],
+                                      ),
+                                      bloqueUsos,
+                                    ],
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        // Mensaje informativo
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
       ),
-      ),
-    );
+    ),
+  );
   }
 }

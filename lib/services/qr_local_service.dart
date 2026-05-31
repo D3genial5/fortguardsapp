@@ -1,9 +1,10 @@
 import 'dart:convert';
-import 'dart:developer' as dev;
+import '../core/app_log.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/qr_local_model.dart';
 import '../models/propietario_model.dart';
+import 'secure_storage_service.dart';
 
 class QrLocalService {
   static const _storageKey = 'qrs_local';
@@ -30,7 +31,7 @@ class QrLocalService {
     list.removeWhere((element) => element.codigo == qr.codigo);
     list.add(qr);
     await _writeList(list);
-    dev.log('QR guardado para propietario: ${qr.propietarioNombre}', name: 'QrLocalService');
+    AppLog.log('QR guardado para propietario: ${qr.propietarioNombre}', name: 'QrLocalService');
   }
 
   static Future<List<QrLocalModel>> listAll({bool removeExpired = true}) async {
@@ -39,7 +40,7 @@ class QrLocalService {
     // Obtener usuario actual (propietario o visitante)
     final usuarioActual = await _getUsuarioActual();
     if (usuarioActual == null) {
-      dev.log('No hay usuario logueado', name: 'QrLocalService');
+      AppLog.log('No hay usuario logueado', name: 'QrLocalService');
       return [];
     }
     
@@ -64,7 +65,7 @@ class QrLocalService {
       list = list.where((q) => q.expira.isAfter(now) && q.usosRestantes > 0).toList();
       
       if (originalCount != list.length) {
-        dev.log('Eliminados ${originalCount - list.length} QRs expirados', name: 'QrLocalService');
+        AppLog.log('Eliminados ${originalCount - list.length} QRs expirados', name: 'QrLocalService');
         // Solo reescribir si se eliminaron QRs
         final allList = await _readList();
         final filteredAll = allList.where((q) => q.expira.isAfter(now) && q.usosRestantes > 0).toList();
@@ -72,7 +73,7 @@ class QrLocalService {
       }
     }
     
-    dev.log('QRs encontrados para ${usuarioActual['nombre']}: ${list.length}', name: 'QrLocalService');
+    AppLog.log('QRs encontrados para ${usuarioActual['nombre']}: ${list.length}', name: 'QrLocalService');
     return list;
   }
 
@@ -115,8 +116,8 @@ class QrLocalService {
       }
       
       // Verificar si hay un visitante logueado
-      final visitanteNombre = prefs.getString('visitante_nombre');
-      final visitanteCi = prefs.getString('visitante_ci');
+      final visitanteNombre = await SecureStorageService.getVisitanteNombre();
+      final visitanteCi = await SecureStorageService.getVisitanteCi();
       if (visitanteNombre != null && visitanteCi != null) {
         return {
           'tipo': 'visitante',
@@ -128,7 +129,7 @@ class QrLocalService {
       
       return null;
     } catch (e) {
-      dev.log('Error obteniendo usuario actual: $e', name: 'QrLocalService');
+      AppLog.log('Error obteniendo usuario actual: $e', name: 'QrLocalService');
       return null;
     }
   }

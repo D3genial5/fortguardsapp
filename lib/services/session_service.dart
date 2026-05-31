@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'dart:io';
@@ -93,30 +94,45 @@ class SessionService {
     try {
       final deviceId = await getDeviceId();
       final deviceInfo = await getDeviceInfo();
-      
+
+      // Las rules requieren `uid` == auth.uid. Si el propietario está logueado
+      // con Custom Token, su uid es `prop_<condo>_<casa>`. Si no hay auth,
+      // se persiste solo localmente.
+      final authUid = FirebaseAuth.instance.currentUser?.uid;
+      if (authUid == null) {
+        // Sin sesión Firebase: persistir solo local.
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('userId', userId);
+        await prefs.setString('condominioId', condominioId);
+        await prefs.setInt('casaNumero', casaNumero);
+        return null;
+      }
+
       // Buscar sesión existente para este dispositivo
       final existingSession = await _firestore
           .collection('sesiones')
           .where('deviceId', isEqualTo: deviceId)
-          .where('uid', isEqualTo: userId)
+          .where('uid', isEqualTo: authUid)
           .where('activo', isEqualTo: true)
           .limit(1)
           .get();
-      
+
       if (existingSession.docs.isNotEmpty) {
         // Actualizar sesión existente
         final sessionId = existingSession.docs.first.id;
         await _firestore.collection('sesiones').doc(sessionId).update({
+          'uid': authUid, // re-afirmar para satisfacer rule
           'ultimoAcceso': FieldValue.serverTimestamp(),
           'deviceInfo': deviceInfo,
         });
-        
+
         _currentSessionId = sessionId;
         if (kDebugMode) debugPrint('Sesión actualizada: $sessionId');
       } else {
         // Crear nueva sesión
         final sessionDoc = await _firestore.collection('sesiones').add({
-          'uid': userId,
+          'uid': authUid,
+          'userKey': userId,         // mantenemos el ID legacy para compat client
           'condominioId': condominioId,
           'casaNumero': casaNumero,
           'deviceId': deviceId,
@@ -125,18 +141,20 @@ class SessionService {
           'ultimoAcceso': FieldValue.serverTimestamp(),
           'activo': true,
         });
-        
+
         _currentSessionId = sessionDoc.id;
         if (kDebugMode) debugPrint('Nueva sesión creada: ${sessionDoc.id}');
       }
-      
+
       // Guardar en SharedPreferences
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('sessionId', _currentSessionId!);
+      if (_currentSessionId != null) {
+        await prefs.setString('sessionId', _currentSessionId!);
+      }
       await prefs.setString('userId', userId);
       await prefs.setString('condominioId', condominioId);
       await prefs.setInt('casaNumero', casaNumero);
-      
+
       return _currentSessionId;
     } catch (e) {
       if (kDebugMode) debugPrint('Error creando/actualizando sesión: $e');

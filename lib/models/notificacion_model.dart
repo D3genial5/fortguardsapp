@@ -26,13 +26,13 @@ class NotificacionModel {
   factory NotificacionModel.fromDoc(String id, Map<String, dynamic> data) {
     return NotificacionModel(
       id: id,
-      condominio: data['condominio'] ?? '',
-      casaNumero: data['casaNumero'] ?? 0,
-      titulo: data['titulo'] ?? '',
-      mensaje: data['mensaje'] ?? '',
+      condominio: (data['condominio'] as String?) ?? '',
+      casaNumero: (data['casaNumero'] as num?)?.toInt() ?? 0,
+      titulo: (data['titulo'] as String?) ?? '',
+      mensaje: (data['mensaje'] as String?) ?? '',
       fecha: (data['fecha'] as Timestamp).toDate(),
-      visto: data['visto'] ?? false,
-      tipo: data['tipo'] ?? 'privada',
+      visto: (data['visto'] as bool?) ?? false,
+      tipo: (data['tipo'] as String?) ?? 'privada',
       prioridad: data['prioridad'],
     );
   }
