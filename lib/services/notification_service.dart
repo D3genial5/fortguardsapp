@@ -18,23 +18,37 @@ class NotificationService {
   String? _currentUserId;
   
   // Inicializar servicio de notificaciones
-  Future<void> initialize(String userId) async {
+  Future<void> initialize(
+    String userId, {
+    String? condominioId,
+    int? casaNumero,
+  }) async {
     _currentUserId = userId;
-    
+
     // Configurar listeners de FCM primero (síncrono)
     _configureFCMListeners();
-    
+
     // Escuchar cambios de token
     _fcm.onTokenRefresh.listen(_saveToken);
-    
+
     // Solicitar permisos
     await _requestPermissions();
-    
+
     // Configurar notificaciones locales
     await _configureLocalNotifications();
-    
+
     // Obtener y guardar token FCM
     await _getAndSaveToken();
+
+    // Suscribir al topic privado de la casa (notificaciones del propietario),
+    // alineado con el naming usado por las Cloud Functions: prop_{condo}_{casa}.
+    if (condominioId != null && casaNumero != null) {
+      try {
+        await _fcm.subscribeToTopic('prop_${condominioId}_$casaNumero');
+      } catch (e) {
+        debugPrint('Error suscribiendo a topic de casa: $e');
+      }
+    }
   }
   
   // Solicitar permisos de notificaciones
