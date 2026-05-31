@@ -31,8 +31,13 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.fortguardsapp"
-        minSdk = flutter.minSdkVersion
+        // NOTA(prod/handover): registrar el package definitivo (p.ej.
+        // com.fortguardsapp) en Firebase y regenerar google-services.json con
+        // `flutterfire configure`. Por ahora se usa el package registrado en el
+        // proyecto dev (fortguard-9bba5) para que el build funcione.
+        applicationId = "com.example.fortguardsapp"
+        // firebase_auth 23.x requiere minSdk >= 23.
+        minSdk = 23
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
