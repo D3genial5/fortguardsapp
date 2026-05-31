@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../widgets/back_handler.dart';
+import '../../services/secure_storage_service.dart';
 
 class MisQrsScreen extends StatefulWidget {
   const MisQrsScreen({super.key});
@@ -23,9 +23,9 @@ class _MisQrsScreenState extends State<MisQrsScreen> {
   }
 
   Future<void> _cargarVisitante() async {
-    final prefs = await SharedPreferences.getInstance();
+    final ci = await SecureStorageService.getVisitanteCi();
     setState(() {
-      _visitanteCi = prefs.getString('visitante_ci');
+      _visitanteCi = ci;
       _isLoading = false;
     });
   }

@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../widgets/back_handler.dart';
 
 import '../../models/solicitud_model.dart';
 import '../../services/solicitud_remote_service.dart';
 import '../../services/condominio_service.dart';
+import '../../services/secure_storage_service.dart';
 
 
 class SolicitudQrScreen extends StatefulWidget {
@@ -22,6 +22,7 @@ class _SolicitudQrScreenState extends State<SolicitudQrScreen> {
 
   bool _nombreBloqueado = false;
   bool _ciBloqueado = false;
+  bool _isSubmitting = false;
 
 
   String? _condominioSeleccionado;
@@ -33,11 +34,17 @@ class _SolicitudQrScreenState extends State<SolicitudQrScreen> {
     super.initState();
     _cargarDatosVisitante();
   }
+
+  @override
+  void dispose() {
+    _nombreApellidosController.dispose();
+    _ciController.dispose();
+    super.dispose();
+  }
   
   Future<void> _cargarDatosVisitante() async {
-    final prefs = await SharedPreferences.getInstance();
-    final nombre = prefs.getString('visitante_nombre') ?? '';
-    final ci = prefs.getString('visitante_ci') ?? '';
+    final nombre = await SecureStorageService.getVisitanteNombre() ?? '';
+    final ci = await SecureStorageService.getVisitanteCi() ?? '';
     _nombreApellidosController.text = nombre;
     _ciController.text = ci;
     _nombreBloqueado = nombre.isNotEmpty;
@@ -46,6 +53,8 @@ class _SolicitudQrScreenState extends State<SolicitudQrScreen> {
   }
 
   void _enviarSolicitud() async {
+    if (_isSubmitting) return;
+
     final nombreApellidos = _nombreApellidosController.text.trim();
     final ci = _ciController.text.trim();
 
@@ -68,11 +77,14 @@ class _SolicitudQrScreenState extends State<SolicitudQrScreen> {
 
 //TODO: mi qr modificar limite
 
+    setState(() {
+      _isSubmitting = true;
+    });
+
     try {
-      // Guarda datos del visitante localmente para mostrarlos en Mi QR
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('visitante_nombre', nombreApellidos);
-      await prefs.setString('visitante_ci', ci);
+      // Guarda datos del visitante en almacenamiento seguro
+      await SecureStorageService.saveVisitanteNombre(nombreApellidos);
+      await SecureStorageService.saveVisitanteCi(ci);
 
       await SolicitudRemoteService.guardarSolicitud(solicitud);
 
@@ -93,6 +105,12 @@ class _SolicitudQrScreenState extends State<SolicitudQrScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Ocurrió un error inesperado')),
       );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
     }
   }
 
@@ -107,23 +125,39 @@ class _SolicitudQrScreenState extends State<SolicitudQrScreen> {
           onPressed: () => context.go('/acceso-general'),
         ),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Center(
-          child: Card(
-            elevation: 3,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: ListView(
-                shrinkWrap: true,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final sidePadding = constraints.maxWidth < 380 ? 12.0 : 16.0;
+
+            return Padding(
+              padding: EdgeInsets.all(sidePadding),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 560),
+                  child: Card(
+                    elevation: 3,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: ListView(
+                        shrinkWrap: true,
+                        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                        children: [
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 8,
+                    runSpacing: 8,
                     children: const [
                       Icon(Icons.assignment_ind_outlined),
-                      SizedBox(width: 8),
-                      Text('Completa tu solicitud', style: TextStyle(fontWeight: FontWeight.w600)),
+                      Text(
+                        'Completa tu solicitud',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        softWrap: false,
+                      ),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -200,16 +234,34 @@ class _SolicitudQrScreenState extends State<SolicitudQrScreen> {
             ),
             const SizedBox(height: 32),
             FilledButton.icon(
-              onPressed: _enviarSolicitud,
-              icon: const Icon(Icons.send_rounded),
-              label: const Text('Enviar solicitud'),
+              onPressed: _isSubmitting ? null : _enviarSolicitud,
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(52),
+              ),
+              icon: _isSubmitting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.send_rounded),
+              label: Text(
+                _isSubmitting ? 'Enviando...' : 'Enviar solicitud',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                softWrap: false,
+              ),
             ),
           ],
         ),
       ),
-    ),
-    ),
-    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
     ),
   );
   }

@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -7,6 +8,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../widgets/back_handler.dart';
+import '../../services/ocr_service.dart';
+import '../../core/feature_flags.dart';
+import '../../services/secure_storage_service.dart';
 
 class RegistroVisitaScreen extends StatefulWidget {
   const RegistroVisitaScreen({super.key});
@@ -23,10 +27,15 @@ class _RegistroVisitaScreenState extends State<RegistroVisitaScreen>
   final _placaController = TextEditingController();
   
   final ImagePicker _picker = ImagePicker();
+
+  final OcrService _ocrService = OcrService();
   
   File? _fotoCarnetFrente;
   File? _fotoCarnetReverso;
   File? _fotoPlaca;
+
+  String? _ciOcrDetectado;
+  bool _esExtranjero = false;
   
   bool _isLoading = false;
   double _uploadProgress = 0.0;
@@ -60,13 +69,79 @@ class _RegistroVisitaScreenState extends State<RegistroVisitaScreen>
 
   Future<void> _cargarDatosExistentes() async {
     final prefs = await SharedPreferences.getInstance();
-    final nombre = prefs.getString('visitante_nombre');
-    final ci = prefs.getString('visitante_ci');
+    final nombre = await SecureStorageService.getVisitanteNombre();
+    final ci = await SecureStorageService.getVisitanteCi();
     final placa = prefs.getString('visitante_placa');
-    
+
     if (nombre != null) _nombreController.text = nombre;
     if (ci != null) _ciController.text = ci;
     if (placa != null) _placaController.text = placa;
+  }
+
+  void _mostrarMensaje(String mensaje, {Color? backgroundColor}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(mensaje),
+        backgroundColor: backgroundColor,
+      ),
+    );
+  }
+
+  Future<bool> _validarCarnetConOcr() async {
+    if (!FeatureFlags.ocrEnabled) return true;
+    if (_esExtranjero) {
+      _ciOcrDetectado = null;
+      return true;
+    }
+
+    if (_fotoCarnetFrente == null || _fotoCarnetReverso == null) {
+      _mostrarMensaje(
+        'Sube el anverso y reverso del CI para validar tu identidad.',
+        backgroundColor: Colors.orange,
+      );
+      return false;
+    }
+
+    try {
+      final result = await _ocrService.validateId(
+        frontImage: _fotoCarnetFrente!,
+        backImage: _fotoCarnetReverso!,
+      );
+
+      if (!mounted) return false;
+
+      if (!result.success) {
+        _mostrarMensaje(
+          'No se pudo validar el CI. ${result.reason ?? ''}',
+          backgroundColor: Colors.red,
+        );
+        return false;
+      }
+
+      final ciIngresado = _ciController.text.trim();
+      final ciOcr = result.idNumber?.trim() ?? '';
+      if (ciOcr.isNotEmpty) {
+        _ciOcrDetectado = ciOcr;
+        if (ciIngresado.isEmpty) {
+          _ciController.text = ciOcr;
+        } else if (ciIngresado != ciOcr) {
+          _mostrarMensaje(
+            'El CI ingresado no coincide con el detectado ($ciOcr).',
+            backgroundColor: Colors.red,
+          );
+          return false;
+        }
+      }
+
+      return true;
+    } catch (e) {
+      _mostrarMensaje(
+        'Error validando el CI. Revisa tu conexión e intenta de nuevo.',
+        backgroundColor: Colors.red,
+      );
+      return false;
+    }
   }
 
   Future<void> _seleccionarFoto(String tipo) async {
@@ -211,26 +286,36 @@ class _RegistroVisitaScreenState extends State<RegistroVisitaScreen>
       await uploadTask;
       return await ref.getDownloadURL();
     } catch (e) {
-      debugPrint('Error subiendo foto: $e');
+      if (kDebugMode) debugPrint('Error subiendo foto: $e');
       return null;
     }
   }
 
   Future<void> _guardarYContinuar() async {
     if (!_formKey.currentState!.validate()) return;
-    
+
     final nombre = _nombreController.text.trim();
     final ci = _ciController.text.trim();
     final placa = _placaController.text.trim();
-    
+
     setState(() => _isLoading = true);
-    
+
+    final valido = await _validarCarnetConOcr();
+    if (!valido) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _uploadProgress = 0.0;
+        });
+      }
+      return;
+    }
+
     try {
-      // Subir fotos si existen
       String? urlCarnetFrente;
       String? urlCarnetReverso;
       String? urlPlaca;
-      
+
       if (_fotoCarnetFrente != null) {
         urlCarnetFrente = await _subirFoto(_fotoCarnetFrente!, 'carnet_frente');
       }
@@ -240,7 +325,7 @@ class _RegistroVisitaScreenState extends State<RegistroVisitaScreen>
       if (_fotoPlaca != null) {
         urlPlaca = await _subirFoto(_fotoPlaca!, 'placa');
       }
-      
+
       // Guardar en Firestore
       final visitanteData = {
         'nombre': nombre,
@@ -249,27 +334,31 @@ class _RegistroVisitaScreenState extends State<RegistroVisitaScreen>
         'fotoCarnetFrente': urlCarnetFrente,
         'fotoCarnetReverso': urlCarnetReverso,
         'fotoPlaca': urlPlaca,
+        'ciOcr': _esExtranjero ? null : _ciOcrDetectado,
+        'ciValidado': !_esExtranjero,
+        'esExtranjero': _esExtranjero,
         'fechaRegistro': FieldValue.serverTimestamp(),
         'activo': true,
       };
-      
+
       await FirebaseFirestore.instance
           .collection('visitantes')
           .doc(ci)
           .set(visitanteData, SetOptions(merge: true));
-      
-      // Guardar localmente también
+
+      // Guardar datos sensibles en almacenamiento seguro
+      await SecureStorageService.saveVisitanteNombre(nombre);
+      await SecureStorageService.saveVisitanteCi(ci);
+      // Datos no sensibles en SharedPreferences
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('visitante_nombre', nombre);
-      await prefs.setString('visitante_ci', ci);
       if (placa.isNotEmpty) {
         await prefs.setString('visitante_placa', placa);
       }
       await prefs.setBool('visitante_registrado', true);
-      
+
       if (!mounted) return;
-      
-      // Mostrar éxito y continuar
+
+      // Mostrar éxito
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Row(
@@ -284,11 +373,20 @@ class _RegistroVisitaScreenState extends State<RegistroVisitaScreen>
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       );
-      
-      await Future.delayed(const Duration(milliseconds: 500));
+
+      // Esperar 2 segundos y mostrar diálogo de términos
+      await Future.delayed(const Duration(seconds: 2));
       if (!mounted) return;
-      context.go('/acceso-general');
-      
+
+      final acepto = await _mostrarDialogoTerminos();
+      if (!mounted) return;
+
+      if (acepto) {
+        final p = await SharedPreferences.getInstance();
+        await p.setBool('terminos_aceptados', true);
+        if (!mounted) return;
+        context.go('/acceso-general');
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -305,6 +403,109 @@ class _RegistroVisitaScreenState extends State<RegistroVisitaScreen>
         });
       }
     }
+  }
+
+  Future<bool> _mostrarDialogoTerminos() async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        final primary = Theme.of(ctx).colorScheme.primary;
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+          title: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: primary.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.gavel_rounded, color: primary, size: 32),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Términos y Condiciones',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Por favor lee y acepta nuestros términos para continuar',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: Colors.grey[600], fontWeight: FontWeight.normal),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            height: 300,
+            child: Scrollbar(
+              thumbVisibility: true,
+              child: SingleChildScrollView(
+                child: Text(
+                  'TÉRMINOS Y CONDICIONES DE USO / POLÍTICA DE PRIVACIDAD – APP FORTGUARDS\n'
+                  'Última Actualización: 30 de marzo de 2026\n\n'
+                  'El presente documento establece los Términos y Condiciones de Uso de la plataforma de administración de edificios y condominios denominada FORTGUARDS (en adelante APP) de propiedad de FORTGUARDSJ S.R.L. (en adelante, "LA EMPRESA"), destinada a la prestación de servicios para la administración de edificios y condominios, accesible a través de aplicación web y móvil.\n\n'
+                  'El acceso y uso de la APP atribuye la condición de USUARIO (en adelante, el "USUARIO"), e implica la aceptación plena y sin reservas de todos los términos y condiciones establecidos en el presente documento.\n\n'
+                  'En caso de que el USUARIO no esté de acuerdo con estos Términos y Condiciones, deberá abstenerse de utilizar la Plataforma.\n\n'
+                  'PRIMERO — OBJETO DEL SERVICIO\n'
+                  'El presente contrato tiene por objeto la prestación por el uso de una plataforma tecnológica en línea (software), denominada FORTGUARDS, tiene como propósito y finalidad apoyar la administración de edificios, oficinas y condominios sometidos al régimen de copropiedad.\n\n'
+                  'SÉPTIMO — OBLIGACIONES DEL USUARIO\n'
+                  'El USUARIO será plenamente responsable del uso que realice de la aplicación, comprometiéndose a utilizarla únicamente para fines lícitos.\n\n'
+                  '• Mantener la confidencialidad de sus credenciales de acceso.\n'
+                  '• No compartir contraseñas con terceros no autorizados.\n'
+                  '• Utilizar dispositivos y redes seguras.\n'
+                  '• Notificar oportunamente cualquier acceso no autorizado.\n\n'
+                  'NOVENO — USO DE LA INFORMACIÓN Y PRIVACIDAD\n'
+                  'LA EMPRESA tiene la obligación de asegurar la confidencialidad de la información almacenada en el sistema. LA EMPRESA no utilizará información del sistema con objetivos distintos a los que se informan al USUARIO.\n\n'
+                  'PROTECCIÓN DE DATOS\n'
+                  'El tratamiento de datos se realizará conforme a normativa boliviana vigente, garantizando seguridad y confidencialidad de la información.\n\n'
+                  'Los datos serán utilizados para:\n'
+                  '• Gestión administrativa del servicio.\n'
+                  '• Procesamiento de pagos y comunicaciones.\n'
+                  '• Seguridad, auditoría y prevención de fraude.\n'
+                  '• Mejora del servicio.\n\n'
+                  'Derechos del Usuario: El USUARIO podrá solicitar acceso, rectificación, eliminación, oposición y portabilidad de sus datos.\n\n'
+                  'ACEPTACIÓN\n'
+                  'El USUARIO declara haber leído, comprendido y aceptado íntegramente el contrato de TÉRMINOS Y CONDICIONES DE USO / POLÍTICA DE USO y sus anexos, los cuales tienen carácter obligatorio y vinculante.\n\n'
+                  'Para consultar el documento completo, visite la sección "Términos y Condiciones" en el menú de la aplicación.\n\n'
+                  'Contacto: +591 65867540 | fortguardbo@gmail.com\n'
+                  'Documento FG-L-01 • Revisión 0.1/2026',
+                  style: TextStyle(fontSize: 12.5, color: Colors.grey[700], height: 1.5),
+                ),
+              ),
+            ),
+          ),
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          actions: [
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('Acepto los Términos y Condiciones', style: TextStyle(fontWeight: FontWeight.w600)),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: Text('No acepto', style: TextStyle(color: Colors.grey[500])),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+    return result ?? false;
   }
 
   @override
@@ -331,13 +532,15 @@ class _RegistroVisitaScreenState extends State<RegistroVisitaScreen>
                 slivers: [
                   // App Bar
                   SliverAppBar(
-                    expandedHeight: 140,
+                    expandedHeight: 120,
                     floating: false,
                     pinned: true,
-                    backgroundColor: Colors.transparent,
+                    backgroundColor: colorScheme.surface,
+                    surfaceTintColor: Colors.transparent,
                     elevation: 0,
                     automaticallyImplyLeading: false,
                     flexibleSpace: FlexibleSpaceBar(
+                      collapseMode: CollapseMode.pin,
                       title: Text(
                         'Registro de Visitante',
                         style: TextStyle(
@@ -360,7 +563,7 @@ class _RegistroVisitaScreenState extends State<RegistroVisitaScreen>
                         ),
                         child: Center(
                           child: Padding(
-                            padding: const EdgeInsets.only(bottom: 40),
+                            padding: const EdgeInsets.only(bottom: 48),
                             child: Icon(
                               Icons.person_add_rounded,
                               size: 48,
@@ -404,19 +607,37 @@ class _RegistroVisitaScreenState extends State<RegistroVisitaScreen>
                               },
                             ),
                             const SizedBox(height: 16),
+                            _buildExtranjeroToggle(colorScheme),
+                            const SizedBox(height: 16),
                             _buildTextField(
                               controller: _ciController,
-                              label: 'Carnet de Identidad',
-                              hint: 'Ej: 12345678',
+                              label: _esExtranjero
+                                  ? 'Documento / Pasaporte'
+                                  : 'Carnet de Identidad',
+                              hint: _esExtranjero ? 'Ej: AB123456' : 'Ej: 12345678',
                               icon: Icons.credit_card_outlined,
-                              keyboardType: TextInputType.number,
-                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                              keyboardType:
+                                  _esExtranjero ? TextInputType.text : TextInputType.number,
+                              textCapitalization: _esExtranjero
+                                  ? TextCapitalization.characters
+                                  : TextCapitalization.none,
+                              inputFormatters: _esExtranjero
+                                  ? [
+                                      FilteringTextInputFormatter.allow(
+                                        RegExp('[A-Za-z0-9]'),
+                                      ),
+                                    ]
+                                  : [FilteringTextInputFormatter.digitsOnly],
                               validator: (value) {
                                 if (value == null || value.trim().isEmpty) {
-                                  return 'El CI es obligatorio';
+                                  return _esExtranjero
+                                      ? 'El documento es obligatorio'
+                                      : 'El CI es obligatorio';
                                 }
                                 if (value.trim().length < 5) {
-                                  return 'CI inválido';
+                                  return _esExtranjero
+                                      ? 'Documento inválido'
+                                      : 'CI inválido';
                                 }
                                 return null;
                               },
@@ -436,7 +657,9 @@ class _RegistroVisitaScreenState extends State<RegistroVisitaScreen>
                             _buildSectionTitle('Documentos', Icons.photo_camera_outlined),
                             const SizedBox(height: 8),
                             Text(
-                              'Agrega fotos de tu documentación (opcional para pruebas)',
+                              _esExtranjero
+                                  ? 'Extranjero: CI frente/reverso no requerido.'
+                                  : 'Agrega fotos de tu documentación (opcional para pruebas)',
                               style: TextStyle(
                                 color: colorScheme.onSurface.withValues(alpha: 0.6),
                                 fontSize: 13,
@@ -563,6 +786,58 @@ class _RegistroVisitaScreenState extends State<RegistroVisitaScreen>
     );
   }
 
+  Widget _buildExtranjeroToggle(ColorScheme colorScheme) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.public, color: colorScheme.primary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Soy extranjero',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'No se requiere CI frente/reverso.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: colorScheme.onSurface.withValues(alpha: 0.6),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Switch.adaptive(
+            value: _esExtranjero,
+            onChanged: (value) {
+              setState(() {
+                _esExtranjero = value;
+                if (value) {
+                  _fotoCarnetFrente = null;
+                  _fotoCarnetReverso = null;
+                  _ciOcrDetectado = null;
+                }
+              });
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildTextField({
     required TextEditingController controller,
     required String label,
@@ -613,6 +888,22 @@ class _RegistroVisitaScreenState extends State<RegistroVisitaScreen>
   }
 
   Widget _buildPhotoSection(ColorScheme colorScheme) {
+    if (_esExtranjero) {
+      return Row(
+        children: [
+          Expanded(
+            child: _buildPhotoCard(
+              'Placa',
+              Icons.directions_car,
+              _fotoPlaca,
+              () => _seleccionarFoto('placa'),
+              colorScheme,
+            ),
+          ),
+        ],
+      );
+    }
+
     return Row(
       children: [
         Expanded(

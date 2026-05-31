@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:device_info_plus/device_info_plus.dart';
@@ -45,7 +45,7 @@ class SessionService {
       
       return _deviceId!;
     } catch (e) {
-      debugPrint('Error obteniendo device ID: $e');
+      if (kDebugMode) debugPrint('Error obteniendo device ID: $e');
       _deviceId = 'fallback_${DateTime.now().millisecondsSinceEpoch}';
       return _deviceId!;
     }
@@ -75,7 +75,7 @@ class SessionService {
         };
       }
     } catch (e) {
-      debugPrint('Error obteniendo info del dispositivo: $e');
+      if (kDebugMode) debugPrint('Error obteniendo info del dispositivo: $e');
     }
     
     return {
@@ -112,7 +112,7 @@ class SessionService {
         });
         
         _currentSessionId = sessionId;
-        debugPrint('Sesión actualizada: $sessionId');
+        if (kDebugMode) debugPrint('Sesión actualizada: $sessionId');
       } else {
         // Crear nueva sesión
         final sessionDoc = await _firestore.collection('sesiones').add({
@@ -127,7 +127,7 @@ class SessionService {
         });
         
         _currentSessionId = sessionDoc.id;
-        debugPrint('Nueva sesión creada: ${sessionDoc.id}');
+        if (kDebugMode) debugPrint('Nueva sesión creada: ${sessionDoc.id}');
       }
       
       // Guardar en SharedPreferences
@@ -139,7 +139,7 @@ class SessionService {
       
       return _currentSessionId;
     } catch (e) {
-      debugPrint('Error creando/actualizando sesión: $e');
+      if (kDebugMode) debugPrint('Error creando/actualizando sesión: $e');
       return null;
     }
   }
@@ -153,7 +153,7 @@ class SessionService {
           'cerradoAt': FieldValue.serverTimestamp(),
         });
         
-        debugPrint('Sesión cerrada: $_currentSessionId');
+        if (kDebugMode) debugPrint('Sesión cerrada: $_currentSessionId');
       }
       
       // Limpiar SharedPreferences (excepto datosCompletos)
@@ -172,7 +172,7 @@ class SessionService {
       
       _currentSessionId = null;
     } catch (e) {
-      debugPrint('Error cerrando sesión: $e');
+      if (kDebugMode) debugPrint('Error cerrando sesión: $e');
     }
   }
   
@@ -195,7 +195,7 @@ class SessionService {
         };
       }
     } catch (e) {
-      debugPrint('Error obteniendo sesión local: $e');
+      if (kDebugMode) debugPrint('Error obteniendo sesión local: $e');
     }
     
     return null;
@@ -217,7 +217,7 @@ class SessionService {
         return data?['activo'] == true;
       }
     } catch (e) {
-      debugPrint('Error verificando sesión: $e');
+      if (kDebugMode) debugPrint('Error verificando sesión: $e');
     }
     
     return false;
@@ -232,7 +232,7 @@ class SessionService {
         });
       }
     } catch (e) {
-      debugPrint('Error actualizando último acceso: $e');
+      if (kDebugMode) debugPrint('Error actualizando último acceso: $e');
     }
   }
   
@@ -255,9 +255,9 @@ class SessionService {
         'cerradoAt': FieldValue.serverTimestamp(),
       });
       
-      debugPrint('Sesión remota cerrada: $sessionId');
+      if (kDebugMode) debugPrint('Sesión remota cerrada: $sessionId');
     } catch (e) {
-      debugPrint('Error cerrando sesión remota: $e');
+      if (kDebugMode) debugPrint('Error cerrando sesión remota: $e');
     }
   }
 }

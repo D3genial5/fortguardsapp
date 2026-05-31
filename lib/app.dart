@@ -15,10 +15,16 @@ import 'app_theme.dart';
 import 'screens/common/help_center_screen.dart';
 import 'screens/common/about_screen.dart';
 import 'screens/common/terms_screen.dart';
+import 'screens/common/splash_screen.dart';
 
 
 final GoRouter _router = GoRouter(
+  initialLocation: '/splash',
   routes: [
+    GoRoute(
+      path: '/splash',
+      builder: (context, state) => const SplashScreen(),
+    ),
     GoRoute(
       path: '/',
       builder: (context, state) => const RegistroVisitaScreen(),

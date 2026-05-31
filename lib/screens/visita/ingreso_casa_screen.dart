@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/codigo_casa_util.dart';
 import '../../widgets/back_handler.dart';
+import '../../services/secure_storage_service.dart';
 
 class IngresoCasaScreen extends StatefulWidget {
   final int casaNumero;
@@ -31,6 +32,12 @@ class _IngresoCasaScreenState extends State<IngresoCasaScreen> {
   @override
   void initState() {
     super.initState();
+  }
+
+  @override
+  void dispose() {
+    _codigoController.dispose();
+    super.dispose();
   }
 
   Future<void> _verificarCodigo() async {
@@ -60,8 +67,8 @@ class _IngresoCasaScreenState extends State<IngresoCasaScreen> {
       await prefs.setString('session_id', sessionId);
       
       // GUARDAR DATOS DEL VISITANTE EN FIRESTORE para que el guardia los vea
-      final nombre = prefs.getString('visitante_nombre');
-      final ci = prefs.getString('visitante_ci');
+      final nombre = await SecureStorageService.getVisitanteNombre();
+      final ci = await SecureStorageService.getVisitanteCi();
       final fotoFrente = prefs.getString('visitante_foto_frente');
       final fotoReverso = prefs.getString('visitante_foto_reverso');
       
@@ -112,69 +119,97 @@ class _IngresoCasaScreenState extends State<IngresoCasaScreen> {
     return BackHandler(
       child: Scaffold(
       appBar: AppBar(title: Text('Código - Casa ${widget.casaNumero}')),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Center(
-          child: Card(
-            elevation: 4,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
-                      Icon(Icons.lock_outline_rounded),
-                      SizedBox(width: 8),
-                      Text('Ingrese el código de la casa', style: TextStyle(fontWeight: FontWeight.w600)),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _codigoController,
-                    keyboardType: TextInputType.number,
-                    maxLength: 3,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                      LengthLimitingTextInputFormatter(3),
-                    ],
-                    onChanged: (value) {
-                      if (value.length < 3 && _codigoInvalido) {
-                        setState(() {
-                          _codigoInvalido = false;
-                        });
-                      }
-                      if (value.length == 3) {
-                        FocusScope.of(context).unfocus();
-                        _verificarCodigo();
-                      }
-                    },
-                    decoration: const InputDecoration(
-                      prefixIcon: Icon(Icons.pin),
-                      labelText: 'Código de la casa',
-                      counterText: '',
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final sidePadding = constraints.maxWidth < 380 ? 12.0 : 24.0;
+
+            return SingleChildScrollView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              padding: EdgeInsets.all(sidePadding),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 440),
+                  child: Card(
+                    elevation: 4,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const Wrap(
+                            alignment: WrapAlignment.center,
+                            spacing: 8,
+                            runSpacing: 8,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              Icon(Icons.lock_outline_rounded),
+                              Text(
+                                'Ingrese el código de la casa',
+                                style: TextStyle(fontWeight: FontWeight.w600),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                softWrap: false,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          TextField(
+                            controller: _codigoController,
+                            keyboardType: TextInputType.number,
+                            maxLength: 3,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              LengthLimitingTextInputFormatter(3),
+                            ],
+                            onChanged: (value) {
+                              if (value.length < 3 && _codigoInvalido) {
+                                setState(() {
+                                  _codigoInvalido = false;
+                                });
+                              }
+                              if (value.length == 3) {
+                                FocusScope.of(context).unfocus();
+                                _verificarCodigo();
+                              }
+                            },
+                            decoration: const InputDecoration(
+                              prefixIcon: Icon(Icons.pin),
+                              labelText: 'Código de la casa',
+                              counterText: '',
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          if (_codigoInvalido)
+                            const Text(
+                              'Código incorrecto',
+                              style: TextStyle(color: Colors.red),
+                              textAlign: TextAlign.center,
+                            ),
+                          const SizedBox(height: 12),
+                          FilledButton.icon(
+                            onPressed: _autoVerificando ? null : _verificarCodigo,
+                            style: FilledButton.styleFrom(
+                              minimumSize: const Size.fromHeight(52),
+                            ),
+                            icon: const Icon(Icons.qr_code_2_rounded),
+                            label: Text(
+                              _autoVerificando ? 'Verificando...' : 'Ver QR',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              softWrap: false,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  if (_codigoInvalido)
-                    const Text(
-                      'Código incorrecto',
-                      style: TextStyle(color: Colors.red),
-                      textAlign: TextAlign.center,
-                    ),
-                  const SizedBox(height: 12),
-                  FilledButton.icon(
-                    onPressed: _autoVerificando ? null : _verificarCodigo,
-                    icon: const Icon(Icons.qr_code_2_rounded),
-                    label: Text(_autoVerificando ? 'Verificando...' : 'Ver QR'),
-                  ),
-                ],
+                ),
               ),
-            ),
-          ),
+            );
+          },
         ),
       ),
       ),

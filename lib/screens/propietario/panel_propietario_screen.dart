@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -16,6 +17,7 @@ import 'package:fortguardsapp/screens/propietario/gestionar_solicitudes_screen.d
 import 'package:fortguardsapp/screens/propietario/mis_qrs_invitados_screen.dart';
 import 'notificaciones_prop_screen.dart';
 import 'reservas_screen.dart';
+import 'panel_widgets.dart';
 
 class PanelPropietarioScreen extends StatefulWidget {
   const PanelPropietarioScreen({super.key});
@@ -28,6 +30,7 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   PropietarioModel? propietario;
   String? estadoExpensa;
+  bool _expensasHabilitadas = true;
   bool botonPeligroActivo = false;
   
   // Información del código
@@ -253,6 +256,13 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
         }
       }
 
+      // Leer flag de expensas habilitadas del documento del condominio
+      final condominioDoc = await FirebaseFirestore.instance
+          .collection('condominios')
+          .doc(base.condominio)
+          .get();
+      final expensasFlag = condominioDoc.data()?['expensasHabilitadas'] ?? true;
+
       final identificador = '${base.condominio}_${base.casa.numero}';
       final codigoDinamico = await CodigoCasaUtil.obtenerOCrearCodigo(identificador: identificador);
 
@@ -267,6 +277,7 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
       setState(() {
         propietario = base.copyWith(codigoCasa: codigoDinamico, personas: personas);
         estadoExpensa = expensa;
+        _expensasHabilitadas = expensasFlag;
         codigoExpira = expiracion;
         codigoUsos = usos;
       });
@@ -279,7 +290,7 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
         casaNumero: base.casa.numero,
       );
     } catch (e) {
-      debugPrint('Error sincronizando código de casa: $e');
+      if (kDebugMode) debugPrint('Error sincronizando código de casa: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -304,13 +315,17 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
       builder: (context) => StatefulBuilder(
         builder: (context, setStateDialog) {
           final scheme = Theme.of(context).colorScheme;
+          final screenSize = MediaQuery.of(context).size;
           
           return Dialog(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
             elevation: 16,
             child: Container(
               width: double.infinity,
-              constraints: const BoxConstraints(maxWidth: 400),
+              constraints: BoxConstraints(
+                maxWidth: 400,
+                maxHeight: screenSize.height * 0.9,
+              ),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(28),
                 gradient: LinearGradient(
@@ -646,45 +661,68 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
                       const SizedBox(height: 28),
                       
                       // Botones de acción
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () => Navigator.pop(context),
-                              style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                                side: BorderSide(color: scheme.outline.withValues(alpha: 0.5)),
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final usarColumna = constraints.maxWidth < 380;
+
+                          final botonCancelar = OutlinedButton(
+                            onPressed: () => Navigator.pop(context),
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size.fromHeight(52),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
                               ),
-                              child: const Text('Cancelar'),
+                              side: BorderSide(color: scheme.outline.withValues(alpha: 0.5)),
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            flex: 2,
-                            child: FilledButton.icon(
-                              onPressed: () {
-                                // Validar que usos esté en rango
-                                final usosFinales = usos.clamp(1, 50);
-                                Navigator.pop(context);
-                                _generarNuevoCodigo(duracionHoras: duracionHoras, usos: usosFinales);
-                              },
-                              style: FilledButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                              ),
-                              icon: const Icon(Icons.qr_code_2_rounded, size: 20),
-                              label: const Text(
-                                'Generar Código',
-                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                            child: const Text(
+                              'Cancelar',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              softWrap: false,
+                            ),
+                          );
+
+                          final botonGenerar = FilledButton.icon(
+                            onPressed: () {
+                              // Validar que usos esté en rango
+                              final usosFinales = usos.clamp(1, 50);
+                              Navigator.pop(context);
+                              _generarNuevoCodigo(duracionHoras: duracionHoras, usos: usosFinales);
+                            },
+                            style: FilledButton.styleFrom(
+                              minimumSize: const Size.fromHeight(52),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
                               ),
                             ),
-                          ),
-                        ],
+                            icon: const Icon(Icons.qr_code_2_rounded, size: 20),
+                            label: const Text(
+                              'Generar Código',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              softWrap: false,
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                            ),
+                          );
+
+                          if (usarColumna) {
+                            return Column(
+                              children: [
+                                SizedBox(width: double.infinity, child: botonCancelar),
+                                const SizedBox(height: 10),
+                                SizedBox(width: double.infinity, child: botonGenerar),
+                              ],
+                            );
+                          }
+
+                          return Row(
+                            children: [
+                              Expanded(child: botonCancelar),
+                              const SizedBox(width: 12),
+                              Expanded(flex: 2, child: botonGenerar),
+                            ],
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -744,7 +782,7 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
           }
         }, onError: (error) {
           // Reconectar en caso de error
-          debugPrint('Error en listener de código: $error');
+          if (kDebugMode) debugPrint('Error en listener de código: $error');
         });
   }
 
@@ -1100,16 +1138,17 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
                       ));
                     },
                   ),
-                  _buildDrawerItem(
-                    icon: Icons.payment,
-                    title: 'Pago expensas',
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.of(context).push(MaterialPageRoute(
-                        builder: (_) => PagoExpensasScreen(propietario: propietario!),
-                      ));
-                    },
-                  ),
+                  if (_expensasHabilitadas)
+                    _buildDrawerItem(
+                      icon: Icons.payment,
+                      title: 'Pago expensas',
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.of(context).push(MaterialPageRoute(
+                          builder: (_) => PagoExpensasScreen(propietario: propietario!),
+                        ));
+                      },
+                    ),
                   _buildDrawerItem(
                     icon: Icons.people,
                     title: 'Invitados',
@@ -1456,17 +1495,18 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
                               },
                             ),
                           ),
-                          Expanded(
-                            child: _buildAccesoRapido(
-                              icono: Icons.payment_rounded,
-                              texto: 'Expensas',
-                              onTap: () {
-                                Navigator.of(context).push(MaterialPageRoute(
-                                  builder: (_) => PagoExpensasScreen(propietario: propietario!),
-                                ));
-                              },
+                          if (_expensasHabilitadas)
+                            Expanded(
+                              child: _buildAccesoRapido(
+                                icono: Icons.payment_rounded,
+                                texto: 'Expensas',
+                                onTap: () {
+                                  Navigator.of(context).push(MaterialPageRoute(
+                                    builder: (_) => PagoExpensasScreen(propietario: propietario!),
+                                  ));
+                                },
+                              ),
                             ),
-                          ),
                           Expanded(
                             child: _buildAccesoRapido(
                               icono: Icons.notifications_rounded,
@@ -1567,12 +1607,16 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
                                 size: 20,
                               ),
                               const SizedBox(width: 8),
-                              Text(
-                                'Personas registradas:',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 16,
-                                  color: Theme.of(context).colorScheme.onPrimaryContainer,
+                              Flexible(
+                                child: Text(
+                                  'Personas registradas:',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 16,
+                                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                  ),
                                 ),
                               ),
                             ],
@@ -1591,11 +1635,15 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
                                   ),
                                 ),
                                 const SizedBox(width: 8),
-                                Text(
-                                  nombre,
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                Flexible(
+                                  child: Text(
+                                    nombre,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -1607,7 +1655,7 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
                     const SizedBox(height: 16),
                     
                     // Estado de expensas
-                    if (estadoExpensa != null)
+                    if (_expensasHabilitadas && estadoExpensa != null)
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
@@ -1626,14 +1674,18 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
                               size: 20,
                             ),
                             const SizedBox(width: 8),
-                            Text(
-                              'Estado expensa:',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 16,
-                                color: _esExpensaPagada(estadoExpensa)
-                                    ? Colors.green.shade800
-                                    : Theme.of(context).colorScheme.onErrorContainer,
+                            Flexible(
+                              child: Text(
+                                'Estado expensa:',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16,
+                                  color: _esExpensaPagada(estadoExpensa)
+                                      ? Colors.green.shade800
+                                      : Theme.of(context).colorScheme.onErrorContainer,
+                                ),
                               ),
                             ),
                             const SizedBox(width: 8),
@@ -1647,12 +1699,38 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
                               ),
                               child: Text(
                                 estadoExpensa!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w600,
                                   color: _esExpensaPagada(estadoExpensa)
                                       ? Colors.white
                                       : Theme.of(context).colorScheme.onError,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    if (!_expensasHabilitadas)
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.money_off_rounded, size: 20, color: Colors.grey.shade500),
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Text(
+                                'Expensas inhabilitadas',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16,
+                                  color: Colors.grey.shade500,
                                 ),
                               ),
                             ),
@@ -1711,12 +1789,16 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
                           ),
                         ),
                         const SizedBox(width: 12),
-                        Text(
-                          'Invitados Aceptados',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Theme.of(context).colorScheme.onSurface,
+                        Expanded(
+                          child: Text(
+                            'Invitados Aceptados',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
                           ),
                         ),
                       ],
@@ -1751,14 +1833,44 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
                               final ci = data['ci'] ?? '';
                               final usos = data['usosRestantes'] ?? data['codigoUsos'] ?? 1;
                               final codigoQr = data['codigoQr'] as String?;
+                              final tipoAcceso = data['tipoAcceso'] ?? 'usos';
+                              final bool esExpirado = tipoAcceso == 'usos' && (usos is int) && usos <= 0;
                               return ListTile(
-                                title: Text(nombre),
-                                subtitle: Row(
+                                title: Text(
+                                  nombre,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                subtitle: Wrap(
+                                  spacing: 6,
+                                  runSpacing: 4,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
                                   children: [
-                                    Expanded(
-                                      child: Text('CI: $ci | Usos: $usos'),
+                                    Text(
+                                      'CI: $ci | Usos: $usos',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
-                                    if (codigoQr != null && codigoQr.isNotEmpty)
+                                    if (esExpirado)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: Colors.red.withValues(alpha: 0.1),
+                                          borderRadius: BorderRadius.circular(10),
+                                          border: Border.all(
+                                            color: Colors.red.withValues(alpha: 0.3),
+                                          ),
+                                        ),
+                                        child: const Text(
+                                          'Expirado',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.red,
+                                          ),
+                                        ),
+                                      ),
+                                    if (!esExpirado && codigoQr != null && codigoQr.isNotEmpty)
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                         decoration: BoxDecoration(
@@ -1825,31 +1937,30 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
                                       },
                                     ),
                                     IconButton(
-                                      icon: const Icon(Icons.edit),
-                                      onPressed: () async {
+                                      icon: Icon(
+                                        Icons.edit,
+                                        color: esExpirado ? Colors.grey : null,
+                                      ),
+                                      onPressed: esExpirado ? null : () async {
                                         // Capturar antes del await
                                         final scaffoldMessenger = ScaffoldMessenger.of(context);
-                                        final resultado = await showDialog<Map<String, dynamic>>(
+                                        final actualizado = await showDialog<bool>(
                                           context: context,
-                                          builder: (ctx) => _buildModificarAccesoDialog(nombre, usos, data),
+                                          builder: (ctx) => ModificarAccesoDialog(
+                                            nombre: nombre,
+                                            usosActuales: usos is int ? usos : 1,
+                                            data: data,
+                                            condominio: propietario!.condominio,
+                                            casaNumero: propietario!.casa.numero,
+                                            codigoCasa: propietario!.codigoCasa,
+                                          ),
                                         );
-                                        
-                                        if (resultado != null) {
-                                          try {
-                                            await docs[index].reference.update(resultado);
-                                            if (!mounted) return;
-                                            scaffoldMessenger.showSnackBar(
-                                              SnackBar(content: Text('Acceso de $nombre actualizado')),
-                                            );
-                                          } catch (e) {
-                                            if (!mounted) return;
-                                            scaffoldMessenger.showSnackBar(
-                                              SnackBar(
-                                                content: Text('Error al actualizar: $e'),
-                                                backgroundColor: Colors.red,
-                                              ),
-                                            );
-                                          }
+
+                                        if (actualizado == true) {
+                                          if (!mounted) return;
+                                          scaffoldMessenger.showSnackBar(
+                                            SnackBar(content: Text('Acceso de $nombre actualizado')),
+                                          );
                                         }
                                       },
                                     ),
@@ -1953,501 +2064,7 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
     );
   }
 
-  Widget _buildModificarAccesoDialog(String nombre, int usosActuales, Map<String, dynamic> data) {
-    // Detectar el tipo de acceso actual basado en los datos existentes
-    String tipoAcceso = data['tipoAcceso'] ?? 'usos';
-    
-    // Si el tipo no está definido pero los usos son muy altos, probablemente es indefinido
-    if (tipoAcceso == 'usos' && usosActuales > 50) {
-      if (data['fechaExpiracion'] != null) {
-        tipoAcceso = 'tiempo';
-      } else {
-        tipoAcceso = 'indefinido';
-      }
-    }
-    
-    // Configurar valores iniciales seguros
-    int usos = (usosActuales > 50) ? 5 : usosActuales; // Valor seguro para el slider
-    int duracionValor = data['duracionValor'] ?? 1;
-    String duracionUnidad = data['duracionUnidad'] ?? 'meses';
-    
-    return StatefulBuilder(
-      builder: (context, setStateDialog) {
-        return Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            constraints: const BoxConstraints(maxWidth: 400),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(
-                        Icons.edit,
-                        color: Theme.of(context).colorScheme.primary,
-                        size: 20,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Modificar acceso',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(context).colorScheme.onSurface,
-                            ),
-                          ),
-                          Text(
-                            nombre,
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                
-                // Tipo de acceso
-                Text(
-                  'Tipo de acceso:',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                
-                // Opciones de tipo
-                Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      _buildTipoAccesoTile(
-                        context,
-                        'usos',
-                        Icons.repeat,
-                        'Por número de usos',
-                        'Limitar la cantidad de veces que puede usar el código',
-                        tipoAcceso,
-                        (valor) => setStateDialog(() => tipoAcceso = valor),
-                      ),
-                      Divider(height: 1, color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3)),
-                      _buildTipoAccesoTile(
-                        context,
-                        'tiempo',
-                        Icons.schedule,
-                        'Por tiempo limitado',
-                        'El código expira después de un período específico',
-                        tipoAcceso,
-                        (valor) => setStateDialog(() => tipoAcceso = valor),
-                      ),
-                      Divider(height: 1, color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3)),
-                      _buildTipoAccesoTile(
-                        context,
-                        'indefinido',
-                        Icons.all_inclusive,
-                        'Acceso indefinido',
-                        'Sin límites de uso ni tiempo (ideal para familia)',
-                        tipoAcceso,
-                        (valor) => setStateDialog(() => tipoAcceso = valor),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-                
-                // Configuración específica
-                if (tipoAcceso == 'usos') ..._buildConfiguracionUsos(context, usos, (valor) => setStateDialog(() => usos = valor)),
-                if (tipoAcceso == 'tiempo') ..._buildConfiguracionTiempo(context, duracionValor, duracionUnidad, 
-                  (valor) => setStateDialog(() => duracionValor = valor),
-                  (unidad) => setStateDialog(() => duracionUnidad = unidad),
-                ),
-                if (tipoAcceso == 'indefinido') ..._buildConfiguracionIndefinido(context),
-                
-                const SizedBox(height: 24),
-                
-                // Botones
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.pop(context),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: const Text('Cancelar'),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: FilledButton(
-                        onPressed: () {
-                          Map<String, dynamic> resultado = {};
-                          
-                          switch (tipoAcceso) {
-                            case 'usos':
-                              resultado = {
-                                'codigoUsos': usos,
-                                'tipoAcceso': 'usos',
-                                'fechaExpiracion': null,
-                              };
-                              break;
-                            case 'tiempo':
-                              final ahora = DateTime.now();
-                              DateTime expiracion;
-                              
-                              switch (duracionUnidad) {
-                                case 'días':
-                                  expiracion = ahora.add(Duration(days: duracionValor));
-                                  break;
-                                case 'semanas':
-                                  expiracion = ahora.add(Duration(days: duracionValor * 7));
-                                  break;
-                                case 'meses':
-                                  expiracion = DateTime(ahora.year, ahora.month + duracionValor, ahora.day);
-                                  break;
-                                case 'años':
-                                  expiracion = DateTime(ahora.year + duracionValor, ahora.month, ahora.day);
-                                  break;
-                                default:
-                                  expiracion = ahora.add(Duration(days: 30));
-                              }
-                              
-                              resultado = {
-                                'codigoUsos': 999999, // Usos ilimitados durante el tiempo
-                                'tipoAcceso': 'tiempo',
-                                'fechaExpiracion': expiracion.toIso8601String(),
-                                'duracionValor': duracionValor,
-                                'duracionUnidad': duracionUnidad,
-                              };
-                              break;
-                            case 'indefinido':
-                              resultado = {
-                                'codigoUsos': 999999,
-                                'tipoAcceso': 'indefinido',
-                                'fechaExpiracion': null,
-                              };
-                              break;
-                          }
-                          
-                          Navigator.pop(context, resultado);
-                        },
-                        style: FilledButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: const Text('Guardar'),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildTipoAccesoTile(
-    BuildContext context,
-    String valor,
-    IconData icono,
-    String titulo,
-    String descripcion,
-    String valorActual,
-    Function(String) onChanged,
-  ) {
-    final isSelected = valor == valorActual;
-    
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => onChanged(valor),
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: isSelected 
-                    ? Theme.of(context).colorScheme.primary
-                    : Theme.of(context).colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  icono,
-                  size: 20,
-                  color: isSelected 
-                    ? Theme.of(context).colorScheme.onPrimary
-                    : Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      titulo,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: isSelected 
-                          ? Theme.of(context).colorScheme.primary
-                          : Theme.of(context).colorScheme.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      descripcion,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (isSelected)
-                Icon(
-                  Icons.check_circle,
-                  color: Theme.of(context).colorScheme.primary,
-                  size: 20,
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  List<Widget> _buildConfiguracionUsos(BuildContext context, int usos, Function(int) onChanged) {
-    return [
-      Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Cantidad de usos:',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Slider(
-              value: usos.toDouble(),
-              min: 1,
-              max: 50,
-              divisions: 49,
-              label: '$usos ${usos == 1 ? "uso" : "usos"}',
-              onChanged: (value) => onChanged(value.round()),
-            ),
-            Center(
-              child: Text(
-                '$usos ${usos == 1 ? "uso" : "usos"}',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    ];
-  }
-
-  List<Widget> _buildConfiguracionTiempo(BuildContext context, int valor, String unidad, Function(int) onValorChanged, Function(String) onUnidadChanged) {
-    return [
-      Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.secondaryContainer.withValues(alpha: 0.3),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Duración del acceso:',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  flex: 2,
-                  child: Column(
-                    children: [
-                      Slider(
-                        value: valor.toDouble(),
-                        min: 1,
-                        max: unidad == 'días' ? 30 : unidad == 'semanas' ? 12 : unidad == 'meses' ? 12 : 5,
-                        divisions: (unidad == 'días' ? 29 : unidad == 'semanas' ? 11 : unidad == 'meses' ? 11 : 4),
-                        label: '$valor',
-                        onChanged: (value) => onValorChanged(value.round()),
-                      ),
-                      Text(
-                        '$valor',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.secondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  flex: 1,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.withValues(alpha: 0.5)),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: unidad,
-                        isExpanded: true,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        items: ['días', 'semanas', 'meses', 'años'].map((String value) {
-                          return DropdownMenuItem<String>(
-                            value: value,
-                            child: Text(
-                              value,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: Colors.black87,
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: (String? newValue) {
-                          if (newValue != null) {
-                            onUnidadChanged(newValue);
-                            // Ajustar el valor si es necesario
-                            if (newValue == 'días' && valor > 30) onValorChanged(30);
-                            if (newValue == 'semanas' && valor > 12) onValorChanged(12);
-                            if (newValue == 'meses' && valor > 12) onValorChanged(12);
-                            if (newValue == 'años' && valor > 5) onValorChanged(5);
-                          }
-                        },
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  'Expira en $valor $unidad',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: Theme.of(context).colorScheme.secondary,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    ];
-  }
-
-  List<Widget> _buildConfiguracionIndefinido(BuildContext context) {
-    return [
-      Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.tertiaryContainer.withValues(alpha: 0.3),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              Icons.all_inclusive,
-              color: Theme.of(context).colorScheme.tertiary,
-              size: 24,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Acceso sin restricciones',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.tertiary,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Este invitado podrá usar el código las veces que necesite, sin límite de tiempo. Ideal para familiares cercanos.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context).colorScheme.onTertiaryContainer,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    ];
-  }
+  // _buildModificarAccesoDialog, _buildTipoAccesoTile, _buildConfiguracionUsos,
+  // _buildConfiguracionTiempo, _buildConfiguracionIndefinido
+  // fueron extraídos a panel_widgets.dart (ModificarAccesoDialog)
 }

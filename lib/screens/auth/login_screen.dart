@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import '../../widgets/back_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -27,6 +28,7 @@ class _LoginScreenState extends State<LoginScreen>
   final _sessionService = SessionService();
   final _notificationService = NotificationService();
   bool _verificandoSesion = true;
+  bool _isLoggingIn = false;
   late final AnimationController _loadingController;
   
   @override
@@ -88,6 +90,8 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   void _login() async {
+    if (_isLoggingIn) return;
+
     final condominio = _condominioController.text.trim();
     final casa = _casaController.text.trim();
     final password = _passwordController.text.trim();
@@ -97,53 +101,43 @@ class _LoginScreenState extends State<LoginScreen>
       return;
     }
 
+    setState(() {
+      _isLoggingIn = true;
+    });
+
     // Mostrar cargando
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (_) => const Center(child: CircularProgressIndicator()),
     );
+    try {
+      final data = await PropietarioAuthService.loginPropietario(
+        condominioId: condominio,
+        casaId: casa,
+        password: password,
+      );
 
-    final data = await PropietarioAuthService.loginPropietario(
-      condominioId: condominio,
-      casaId: casa,
-      password: password,
-    );
+      if (mounted) Navigator.of(context).pop();
 
-    if (mounted) Navigator.of(context).pop();
-
-    if (data != null) {
+      if (data != null) {
       // Verificar si es primera vez en este dispositivo
       final isFirstTime = await _sessionService.isFirstTimeOnDevice();
       
       // Crear o actualizar sesión
-      final casaNumero = data['casa']['numero'] as int;
+      final casaData = data['casa'] as Map<String, dynamic>?;
+      final casaNumeroRaw = casaData?['numero'];
+      final casaNumero = casaNumeroRaw is int
+          ? casaNumeroRaw
+          : int.tryParse(casaNumeroRaw?.toString() ?? '');
+      if (casaNumero == null) {
+        throw Exception('No se pudo obtener el número de casa');
+      }
       final condominioId = data['condominio'] as String;
       
-      // Buscar o crear credencial del usuario
-      final credencialQuery = await FirebaseFirestore.instance
-          .collection('credenciales')
-          .where('condominio', isEqualTo: condominioId)
-          .where('casa', isEqualTo: casaNumero)
-          .where('tipo', isEqualTo: 'propietario')
-          .limit(1)
-          .get();
-      
-      String userId;
-      if (credencialQuery.docs.isNotEmpty) {
-        userId = credencialQuery.docs.first.id;
-      } else {
-        // Crear nueva credencial si no existe
-        final newCredencial = await FirebaseFirestore.instance.collection('credenciales').add({
-          'condominio': condominioId,
-          'casa': casaNumero,
-          'tipo': 'propietario',
-          'password': password,
-          'createdAt': FieldValue.serverTimestamp(),
-        });
-        userId = newCredencial.id;
-      }
-      
+      // ID derivado de condominio+casa (sin colección credenciales)
+      final userId = '${condominioId}_$casaNumero';
+
       // Crear sesión
       await _sessionService.createOrUpdateSession(
         userId: userId,
@@ -172,16 +166,28 @@ class _LoginScreenState extends State<LoginScreen>
       
       // Inicializar notificaciones en segundo plano (no bloqueante)
       if (mounted) {
-        _notificationService.initialize(userId).then((_) {
+        _notificationService.initialize(userId, condominioId: condominioId, casaNumero: casaNumero).then((_) {
           _notificationService.subscribeToCondominio(condominioId);
         }).catchError((e) {
-          debugPrint('Error inicializando notificaciones: $e');
+          if (kDebugMode) debugPrint('Error inicializando notificaciones: $e');
         });
       }
       
-      _irAlPanelPropietario();
-    } else {
-      _mostrarError('Datos incorrectos');
+        _irAlPanelPropietario();
+      } else {
+        _mostrarError('Datos incorrectos');
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).popUntil((route) => route is! PopupRoute);
+      }
+      _mostrarError('No se pudo iniciar sesión. Verifica tus datos e intenta nuevamente.');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoggingIn = false;
+        });
+      }
     }
   }
 
@@ -200,32 +206,33 @@ class _LoginScreenState extends State<LoginScreen>
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final splashIsoSize = (screenWidth * 0.3).clamp(96.0, 132.0);
-    final splashLettersWidth = (screenWidth * 0.5).clamp(170.0, 240.0);
-    final loadingFontSize = (screenWidth * 0.08).clamp(26.0, 32.0);
+    final logoIsoSize = (screenWidth * 0.44).clamp(138.0, 196.0);
+    final logoLettersWidth = (screenWidth * 0.74).clamp(220.0, 340.0);
+    final logoLettersHeight = (screenWidth * 0.15).clamp(48.0, 66.0);
 
     // Mostrar pantalla de carga mientras verifica sesión
     if (_verificandoSesion) {
+      final logoWidth = (screenWidth * 0.62).clamp(220.0, 360.0);
+      final lettersWidth = (screenWidth * 0.86).clamp(260.0, 460.0);
       return Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Logo FortGuard
+              // Logo + letras de marca
               Image.asset(
-                'assets/FORTGUARD-ISO1.png',
-                width: splashIsoSize,
-                height: splashIsoSize,
-              ),
-              const SizedBox(height: 20),
-              Image.asset(
-                'assets/fortguard_letras.png',
-                width: splashLettersWidth,
-                height: 40,
+                'assets/FORTGUARD-LOGO.png',
+                width: logoWidth,
                 fit: BoxFit.contain,
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 14),
+              Image.asset(
+                'assets/fortguard_letras.png',
+                width: lettersWidth,
+                fit: BoxFit.contain,
+              ),
+              const SizedBox(height: 28),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -237,16 +244,6 @@ class _LoginScreenState extends State<LoginScreen>
                 ],
               ),
               const SizedBox(height: 18),
-              Text(
-                'CARGANDO',
-                style: TextStyle(
-                  fontSize: loadingFontSize,
-                  fontWeight: FontWeight.w700,
-                  fontFamily: 'Poppins',
-                  letterSpacing: 1.2,
-                  color: Color(0xFF1A1A1A),
-                ),
-              ),
             ],
           ),
         ),
@@ -262,29 +259,35 @@ class _LoginScreenState extends State<LoginScreen>
           onPressed: () => context.go('/acceso-general'),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const SizedBox(height: 20),
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final sidePadding = constraints.maxWidth < 380 ? 12.0 : 24.0;
+
+            return SingleChildScrollView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              padding: EdgeInsets.all(sidePadding),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 420),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                const SizedBox(height: 8),
                 // Logo FortGuard
                 Image.asset(
-                  'assets/FORTGUARD-ISO1.png',
-                  width: 100,
-                  height: 100,
+                  'assets/FORTGUARD-LOGO.png',
+                  width: logoIsoSize,
+                  height: logoIsoSize,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 10),
                 Image.asset(
                   'assets/fortguard_letras.png',
-                  width: 180,
-                  height: 35,
+                  width: logoLettersWidth,
+                  height: logoLettersHeight,
                   fit: BoxFit.contain,
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 4),
                 Text(
                   'Propietarios',
                   style: TextStyle(
@@ -292,7 +295,7 @@ class _LoginScreenState extends State<LoginScreen>
                     color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                   ),
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 20),
                 TextField(
                   controller: _condominioController,
                   decoration: const InputDecoration(labelText: 'CONDOMINIO'),
@@ -314,17 +317,31 @@ class _LoginScreenState extends State<LoginScreen>
                   width: double.infinity,
                   child: ElevatedButton(
                     style: FilledButton.styleFrom(
-                      minimumSize: const Size.fromHeight(48),
+                      minimumSize: const Size.fromHeight(52),
                       backgroundColor: Theme.of(context).colorScheme.primary,
                       foregroundColor: Theme.of(context).colorScheme.onPrimary,
                     ),
-                    onPressed: _login,
-                    child: const Text('Ingresar'),
+                    onPressed: _isLoggingIn ? null : _login,
+                    child: _isLoggingIn
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text(
+                            'Ingresar',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            softWrap: false,
+                          ),
                   ),
                 ),
               ],
-            ),
-          ),
+                  ),
+                ),
+              ),
+            );
+          },
         ),
       ),
       ),
