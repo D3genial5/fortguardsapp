@@ -30,7 +30,8 @@ class _MiQrScreenState extends State<MiQrScreen> {
   @override
   void initState() {
     super.initState();
-    _cargarDatosVisitante();
+    // La carga inicial corre en didChangeDependencies: ScaffoldMessenger.of()
+    // todavia no esta disponible en initState.
   }
 
   bool _esSolicitudQrInvalida(SolicitudModel solicitud) {
@@ -301,7 +302,7 @@ class _MiQrScreenState extends State<MiQrScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Image.asset(
-                  'assets/FORTGUARD-LOGO.png',
+                  'assets/fortguard_logo.png',
                   width: logoWidth,
                   fit: BoxFit.contain,
                 ),

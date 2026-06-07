@@ -234,7 +234,7 @@ class _LoginScreenState extends State<LoginScreen>
             children: [
               // Logo + letras de marca
               Image.asset(
-                'assets/FORTGUARD-LOGO.png',
+                'assets/fortguard_logo.png',
                 width: logoWidth,
                 fit: BoxFit.contain,
               ),
@@ -288,7 +288,7 @@ class _LoginScreenState extends State<LoginScreen>
                 const SizedBox(height: 8),
                 // Logo FortGuard
                 Image.asset(
-                  'assets/FORTGUARD-LOGO.png',
+                  'assets/fortguard_logo.png',
                   width: logoIsoSize,
                   height: logoIsoSize,
                 ),
