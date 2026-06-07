@@ -16,7 +16,9 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace = "com.fortguardsapp"
+    // namespace = applicationId = package de MainActivity (com.example.fortguardsapp)
+    // para que el manifest ".MainActivity" resuelva a la clase real.
+    namespace = "com.example.fortguardsapp"
     compileSdk = 36
     ndkVersion = "27.0.12077973"
 
