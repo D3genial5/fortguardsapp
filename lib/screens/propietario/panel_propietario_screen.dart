@@ -194,11 +194,12 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
     // Fallback: reconstruir desde sesión local si no hay modelo persistido
     if (modelo == null) {
       final condominioId = prefs.getString('condominioId');
-      final casaNumero = prefs.getInt('casaNumero');
+      // Compat: versiones anteriores guardaban casaNumero como int.
+      final casaNumero = prefs.get('casaNumero')?.toString();
       if (condominioId != null && casaNumero != null) {
         modelo = PropietarioModel(
           condominio: condominioId,
-          casa: Casa(nombre: casaNumero.toString(), numero: casaNumero),
+          casa: Casa(nombre: casaNumero, numero: casaNumero),
           codigoCasa: '',
           personas: const [],
         );
@@ -774,7 +775,7 @@ class _PanelPropietarioScreenState extends State<PanelPropietarioScreen> with Si
     );
   }
   
-  void _escucharCambiosCodigo(String condominioId, int casaNumero) {
+  void _escucharCambiosCodigo(String condominioId, String casaNumero) {
     // Cancelar suscripción anterior si existe
     _codigoSubscription?.cancel();
     

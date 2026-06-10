@@ -82,7 +82,7 @@ class NotificacionService {
   /// Guardar token FCM en Firestore para un usuario específico
   static Future<void> guardarTokenUsuario({
     required String condominio,
-    required int casaNumero,
+    required String casaNumero,
   }) async {
     if (_fcmToken == null) return;
     
@@ -105,7 +105,7 @@ class NotificacionService {
   /// Suscribirse a tópicos FCM para recibir notificaciones push
   static Future<void> suscribirseATopicos({
     required String condominio,
-    required int casaNumero,
+    required String casaNumero,
   }) async {
     try {
       final messaging = FirebaseMessaging.instance;
@@ -126,7 +126,7 @@ class NotificacionService {
   /// Desuscribirse de tópicos FCM (al cerrar sesión)
   static Future<void> desuscribirseDeTopicos({
     required String condominio,
-    required int casaNumero,
+    required String casaNumero,
   }) async {
     try {
       final messaging = FirebaseMessaging.instance;
@@ -227,7 +227,7 @@ class NotificacionService {
 
   static Stream<List<NotificacionModel>> streamNotificaciones({
     required String condominioId,
-    required int casaNumero,
+    required String casaNumero,
   }) {
     return _db
         .collection('notificaciones')
@@ -276,7 +276,7 @@ class NotificacionService {
   /// Iniciar escucha de notificaciones nuevas para mostrar como push
   static void escucharNotificaciones({
     required String condominioId,
-    int? casaNumero,
+    String? casaNumero,
   }) {
     // Cancelar suscripción anterior si existe
     _notificacionesSubscription?.cancel();
@@ -317,10 +317,11 @@ class NotificacionService {
           
           // Verificar si es para todo el condominio o para esta casa específica
           final tipo = data['tipo'] as String?;
-          final casaNotif = data['casaNumero'] as int?;
-          
-          final esParaTodos = tipo == 'condominio' || casaNotif == 0 || casaNotif == null;
-          final esParaMiCasa = casaNumero != null && casaNotif == casaNumero;
+          final casaNotif = data['casaNumero']?.toString();
+
+          final esParaTodos =
+              tipo == 'condominio' || casaNotif == '0' || casaNotif == null;
+          final esParaMiCasa = casaNotif == casaNumero;
           
           if (esParaTodos || esParaMiCasa) {
             final titulo = data['titulo'] as String? ?? 'Nueva notificación';

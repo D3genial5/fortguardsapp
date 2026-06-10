@@ -3,7 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class NotificacionModel {
   final String id;
   final String condominio;
-  final int casaNumero;
+  final String casaNumero;
   final String titulo;
   final String mensaje;
   final DateTime fecha;
@@ -27,7 +27,7 @@ class NotificacionModel {
     return NotificacionModel(
       id: id,
       condominio: (data['condominio'] as String?) ?? '',
-      casaNumero: (data['casaNumero'] as num?)?.toInt() ?? 0,
+      casaNumero: data['casaNumero']?.toString() ?? '',
       titulo: (data['titulo'] as String?) ?? '',
       mensaje: (data['mensaje'] as String?) ?? '',
       fecha: (data['fecha'] as Timestamp).toDate(),

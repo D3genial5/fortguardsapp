@@ -10,7 +10,7 @@ import '../../services/qr_local_service.dart';
 import '../../models/qr_local_model.dart';
 
 class IngresoCasaScreen extends StatefulWidget {
-  final int casaNumero;
+  final String casaNumero;
   final String condominio;
 
   const IngresoCasaScreen({

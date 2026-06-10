@@ -17,10 +17,10 @@ class NotificationService {
   String? _currentToken;
   String? _currentUserId;
   String? _condominioId;
-  int? _casaNumero;
+  String? _casaNumero;
 
   // Inicializar servicio de notificaciones
-  Future<void> initialize(String userId, {String? condominioId, int? casaNumero}) async {
+  Future<void> initialize(String userId, {String? condominioId, String? casaNumero}) async {
     _currentUserId = userId;
     _condominioId = condominioId;
     _casaNumero = casaNumero;

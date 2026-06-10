@@ -26,7 +26,7 @@ class _SolicitudQrScreenState extends State<SolicitudQrScreen> {
 
 
   String? _condominioSeleccionado;
-  int? _casaSeleccionada;
+  String? _casaSeleccionada;
 
 
   @override
@@ -193,7 +193,7 @@ class _SolicitudQrScreenState extends State<SolicitudQrScreen> {
             const SizedBox(height: 16),
             if (_condominioSeleccionado != null) ...[
               const Text('Casa'),
-              StreamBuilder<List<int>>(
+              StreamBuilder<List<String>>(
                 stream: CondominioService.streamCasas(_condominioSeleccionado!),
                 builder: (context, snapshot) {
                   if (snapshot.hasError) {
@@ -207,7 +207,7 @@ class _SolicitudQrScreenState extends State<SolicitudQrScreen> {
                   }
                   final casas = snapshot.data!;
                   if (casas.isEmpty) return const Text('Sin casas registradas');
-                  return DropdownButton<int>(
+                  return DropdownButton<String>(
                     value: _casaSeleccionada != null && casas.contains(_casaSeleccionada) ? _casaSeleccionada : null,
                     hint: const Text('Selecciona una casa'),
                     isExpanded: true,

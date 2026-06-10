@@ -126,11 +126,8 @@ class _LoginScreenState extends State<LoginScreen>
       
       // Crear o actualizar sesión
       final casaData = data['casa'] as Map<String, dynamic>?;
-      final casaNumeroRaw = casaData?['numero'];
-      final casaNumero = casaNumeroRaw is int
-          ? casaNumeroRaw
-          : int.tryParse(casaNumeroRaw?.toString() ?? '');
-      if (casaNumero == null) {
+      final casaNumero = casaData?['numero']?.toString();
+      if (casaNumero == null || casaNumero.isEmpty) {
         throw Exception('No se pudo obtener el número de casa');
       }
       final condominioId = data['condominio'] as String;

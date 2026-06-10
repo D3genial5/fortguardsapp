@@ -51,7 +51,7 @@ class SolicitudService {
   }
 
   /// Filtrar solicitudes por condominio y casa
-  static Future<List<SolicitudModel>> obtenerPorCasa(String condominio, int casa) async {
+  static Future<List<SolicitudModel>> obtenerPorCasa(String condominio, String casa) async {
     final solicitudes = await obtenerSolicitudes();
     return solicitudes.where((s) =>
       s.condominio == condominio &&

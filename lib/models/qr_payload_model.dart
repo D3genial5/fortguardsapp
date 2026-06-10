@@ -4,7 +4,8 @@ import 'package:crypto/crypto.dart';
 /// Modelo del payload del QR con firma HMAC
 class QrPayloadModel {
   final String condominio; // c
-  final int casaNumero; // h
+  // Identificador de casa: puede ser numérico ("21") o texto ("Acacia 21").
+  final String casaNumero; // h
   final String codigoCasa; // k
   final int issuedAt; // iat - epoch milliseconds
   final int expiresAt; // exp - epoch milliseconds
@@ -27,7 +28,7 @@ class QrPayloadModel {
   factory QrPayloadModel.fromJson(Map<String, dynamic> json) {
     return QrPayloadModel(
       condominio: json['c'] as String,
-      casaNumero: json['h'] as int,
+      casaNumero: json['h'].toString(),
       codigoCasa: json['k'] as String,
       issuedAt: json['iat'] as int,
       expiresAt: json['exp'] as int,

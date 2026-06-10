@@ -10,28 +10,30 @@ class CondominioService {
         );
   }
 
-  // Stream de los números de casa de un condominio
-  static Stream<List<int>> streamCasas(String condominioId) {
+  // Stream de los identificadores de casa de un condominio.
+  // Pueden ser numéricos ("21") o texto ("Acacia 21"); se ordenan
+  // numéricamente cuando ambos lo son, alfabéticamente si no.
+  static Stream<List<String>> streamCasas(String condominioId) {
     return _db
         .collection('condominios')
         .doc(condominioId)
         .collection('casas')
         .snapshots()
         .map((snap) {
-          final numeros = <int>[];
+          final numeros = <String>[];
           for (final d in snap.docs) {
-            final raw = d.data()['numero'];
-            int? n;
-            if (raw is int) {
-              n = raw;
-            } else if (raw is String) {
-              n = int.tryParse(raw);
-            }
-            // fallback: intenta con el ID del doc
-            n ??= int.tryParse(d.id);
-            if (n != null) numeros.add(n);
+            final raw = d.data()['numero']?.toString().trim();
+            final n = (raw == null || raw.isEmpty) ? d.id : raw;
+            if (n.isNotEmpty) numeros.add(n);
           }
-          numeros.sort();
+          numeros.sort((a, b) {
+            final na = int.tryParse(a);
+            final nb = int.tryParse(b);
+            if (na != null && nb != null) return na.compareTo(nb);
+            if (na != null) return -1;
+            if (nb != null) return 1;
+            return a.toLowerCase().compareTo(b.toLowerCase());
+          });
           return numeros;
         });
   }

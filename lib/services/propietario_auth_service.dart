@@ -56,7 +56,7 @@ class PropietarioAuthService {
 
       final condoIdResp = data!['condominio'] as String;
       final casaIdResp = data['casaId'] as String;
-      final casaNumero = data['casaNumero'] as int? ?? int.tryParse(casaIdResp);
+      final casaNumero = data['casaNumero']?.toString() ?? casaIdResp;
       final residentes = (data['residentes'] as List?)?.cast<String>() ?? const [];
 
       return {

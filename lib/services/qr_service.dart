@@ -94,7 +94,7 @@ class QrService {
   /// Obtener todos los QR de un propietario
   static Stream<List<QrInvitadoModel>> obtenerQrsPorPropietario({
     required String condominio,
-    required int casaNumero,
+    required String casaNumero,
   }) {
     return _db
         .collection(_collectionQr)

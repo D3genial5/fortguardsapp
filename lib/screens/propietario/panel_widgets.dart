@@ -9,7 +9,7 @@ class ModificarAccesoDialog extends StatefulWidget {
   final int usosActuales;
   final Map<String, dynamic> data;
   final String condominio;
-  final int casaNumero;
+  final String casaNumero;
   final String? codigoCasa;
 
   const ModificarAccesoDialog({

@@ -89,7 +89,7 @@ class SessionService {
   Future<String?> createOrUpdateSession({
     required String userId,
     required String condominioId,
-    required int casaNumero,
+    required String casaNumero,
   }) async {
     try {
       final deviceId = await getDeviceId();
@@ -104,7 +104,7 @@ class SessionService {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('userId', userId);
         await prefs.setString('condominioId', condominioId);
-        await prefs.setInt('casaNumero', casaNumero);
+        await prefs.setString('casaNumero', casaNumero);
         return null;
       }
 
@@ -153,7 +153,7 @@ class SessionService {
       }
       await prefs.setString('userId', userId);
       await prefs.setString('condominioId', condominioId);
-      await prefs.setInt('casaNumero', casaNumero);
+      await prefs.setString('casaNumero', casaNumero);
 
       return _currentSessionId;
     } catch (e) {
@@ -202,7 +202,8 @@ class SessionService {
       final sessionId = prefs.getString('sessionId');
       final userId = prefs.getString('userId');
       final condominioId = prefs.getString('condominioId');
-      final casaNumero = prefs.getInt('casaNumero');
+      // Compat: versiones anteriores guardaban casaNumero como int.
+      final casaNumero = prefs.get('casaNumero')?.toString();
       
       if (sessionId != null && userId != null) {
         return {

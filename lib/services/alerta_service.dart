@@ -8,7 +8,7 @@ class AlertaService {
   /// Enviar una nueva alerta de emergencia
   static Future<String> enviarAlerta({
     required String tipo,
-    required int casaNumero,
+    required String casaNumero,
     required String condominio,
     required String propietarioId,
     required String propietarioNombre,

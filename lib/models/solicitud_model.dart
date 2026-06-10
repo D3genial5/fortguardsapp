@@ -4,7 +4,7 @@ class SolicitudModel {
   final String apellidos;
   final String ci;
   final String condominio;
-  final int casaNumero;
+  final String casaNumero;
   final DateTime fecha;
   final String estado; // 'pendiente', 'aceptada', 'rechazada'
   final int? usosRestantes;
@@ -36,7 +36,7 @@ class SolicitudModel {
       apellidos: json['apellidos'] ?? '',
       ci: json['ci'] ?? '',
       condominio: json['condominio'] ?? '',
-      casaNumero: json['casaNumero'] ?? 0,
+      casaNumero: json['casaNumero']?.toString() ?? '',
       fecha: DateTime.tryParse(json['fecha'] ?? '') ?? DateTime.now(),
       estado: json['estado'] ?? 'pendiente',
       usosRestantes: json['usosRestantes'],

@@ -14,7 +14,7 @@ class QrGeneratorService {
   /// Genera un QR para propietario/casa
   static Future<String> generateForPropietario({
     required String condominio,
-    required int casaNumero,
+    required String casaNumero,
     required String codigoCasa,
     int validityHours = 12,
     int? usosMaximos,
@@ -51,7 +51,7 @@ class QrGeneratorService {
   /// Genera un QR para invitado (con hash del CI)
   static Future<String> generateForInvitado({
     required String condominio,
-    required int casaNumero,
+    required String casaNumero,
     required String codigoCasa,
     required String visitanteCi,
     int validityHours = 12,
@@ -93,7 +93,7 @@ class QrGeneratorService {
   /// Genera un QR desde una solicitud de acceso aceptada
   static Future<String> generateFromAccessRequest({
     required String condominio,
-    required int casaNumero,
+    required String casaNumero,
     required String codigoCasa,
     required String visitanteCi,
     String? tipoAcceso,

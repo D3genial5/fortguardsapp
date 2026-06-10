@@ -15,7 +15,7 @@ class SeleccionCasaScreen extends StatelessWidget {
       appBar: AppBar(title: Text('Entrada - $condominioId')),
       body: Padding(
         padding: const EdgeInsets.all(16),
-        child: StreamBuilder<List<int>>( 
+        child: StreamBuilder<List<String>>(
           stream: CondominioService.streamCasas(condominioId),
           builder: (context, snapshot) {
             if (!snapshot.hasData) {

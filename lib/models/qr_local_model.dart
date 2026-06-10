@@ -1,7 +1,8 @@
 class QrLocalModel {
   final String codigo; // Código cifrado o texto que representa el QR
   final String condominio;
-  final int casa;
+  // Identificador de casa: puede ser numérico ("21") o texto ("Acacia 21").
+  final String casa;
   final DateTime expira;
   final int usosRestantes;
   final String? propietarioId; // ID único del propietario
@@ -21,7 +22,7 @@ class QrLocalModel {
     return QrLocalModel(
       codigo: json['codigo'] as String,
       condominio: json['condominio'] as String,
-      casa: json['casa'] as int,
+      casa: json['casa'].toString(),
       expira: DateTime.parse(json['expira'] as String),
       usosRestantes: json['usosRestantes'] as int,
       propietarioId: json['propietarioId'] as String?,

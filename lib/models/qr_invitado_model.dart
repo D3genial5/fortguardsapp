@@ -19,7 +19,7 @@ enum EstadoQr {
 class QrInvitadoModel {
   final String codigo;          // ID único del QR (payload)
   final String condominio;      // Condominio del propietario
-  final int casaNumero;         // Número de casa
+  final String casaNumero;      // Identificador de casa (numérico o texto)
   final TipoQr tipo;            // Tipo de QR
   final String invitadoNombre;  // Nombre completo del invitado
   final String invitadoCi;      // CI del invitado
@@ -69,7 +69,7 @@ class QrInvitadoModel {
     return QrInvitadoModel(
       codigo: data['codigo'] ?? doc.id,
       condominio: (data['condominio'] as String?) ?? '',
-      casaNumero: (data['casaNumero'] as num?)?.toInt() ?? 0,
+      casaNumero: data['casaNumero']?.toString() ?? '',
       tipo: TipoQr.values.firstWhere(
         (t) => t.name == data['tipo'],
         orElse: () => TipoQr.permanente,
@@ -141,7 +141,7 @@ class QrInvitadoModel {
   QrInvitadoModel copyWith({
     String? codigo,
     String? condominio,
-    int? casaNumero,
+    String? casaNumero,
     TipoQr? tipo,
     String? invitadoNombre,
     String? invitadoCi,

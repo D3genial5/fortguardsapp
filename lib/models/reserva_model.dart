@@ -5,7 +5,7 @@ class ReservaModel {
   final String condominioId;
   final String areaId;
   final String areaNombre;
-  final int casaNumero;
+  final String casaNumero;
   final String userId;
   final String userName;
   final DateTime fechaInicio;
@@ -40,7 +40,7 @@ class ReservaModel {
       condominioId: (data['condominioId'] as String?) ?? '',
       areaId: (data['areaId'] as String?) ?? '',
       areaNombre: (data['areaNombre'] as String?) ?? '',
-      casaNumero: (data['casaNumero'] as num?)?.toInt() ?? 0,
+      casaNumero: data['casaNumero']?.toString() ?? '',
       userId: (data['userId'] as String?) ?? '',
       userName: (data['userName'] as String?) ?? '',
       fechaInicio: (data['fechaInicio'] as Timestamp).toDate(),
@@ -80,7 +80,7 @@ class ReservaModel {
     String? condominioId,
     String? areaId,
     String? areaNombre,
-    int? casaNumero,
+    String? casaNumero,
     String? userId,
     String? userName,
     DateTime? fechaInicio,

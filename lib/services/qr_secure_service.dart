@@ -22,7 +22,7 @@ class QrSecureService {
   /// - [forceRefresh] omite la cache (usar al regenerar)
   static Future<String> getQr({
     required String condominio,
-    required int casaNumero,
+    required String casaNumero,
     required String codigoCasa,
     required String tipo,
     int validityHours = 12,

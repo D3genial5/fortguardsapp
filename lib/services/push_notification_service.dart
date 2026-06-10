@@ -112,14 +112,14 @@ class PushNotificationService {
   
   String? _currentRole;
   String? _condominio;
-  int? _casaNumero;
+  String? _casaNumero;
   String? _qrCodigo;
   
   // Inicializar servicio completo
   Future<void> initialize({
     required String role,
     String? condominio,
-    int? casaNumero,
+    String? casaNumero,
     String? qrCodigo,
   }) async {
     _currentRole = role;
@@ -508,7 +508,7 @@ class PushNotificationService {
   Future<void> updateSubscriptions({
     String? role,
     String? condominio,
-    int? casaNumero,
+    String? casaNumero,
     String? qrCodigo,
   }) async {
     _currentRole = role ?? _currentRole;

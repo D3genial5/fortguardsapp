@@ -236,7 +236,7 @@ class _MisQrsInvitadosScreenState extends State<MisQrsInvitadosScreen> {
 
 class DialogoCrearQr extends StatefulWidget {
   final String condominio;
-  final int casaNumero;
+  final String casaNumero;
   final String propietarioId;
 
   const DialogoCrearQr({

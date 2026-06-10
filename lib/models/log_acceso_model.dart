@@ -15,7 +15,7 @@ class LogAccesoModel {
   final String guardiaId;         // ID del guardia que escaneó
   final String guardiaNombre;     // Nombre del guardia
   final String condominio;        // Condominio
-  final int casaNumero;           // Casa del invitado
+  final String casaNumero;        // Casa del invitado (numérico o texto)
   final String invitadoNombre;    // Nombre del invitado
   final String invitadoCi;        // CI del invitado
   final String? placaVehiculo;    // Placa (opcional)
@@ -64,7 +64,7 @@ class LogAccesoModel {
       guardiaId: (data['guardiaId'] as String?) ?? '',
       guardiaNombre: (data['guardiaNombre'] as String?) ?? '',
       condominio: (data['condominio'] as String?) ?? '',
-      casaNumero: (data['casaNumero'] as num?)?.toInt() ?? 0,
+      casaNumero: data['casaNumero']?.toString() ?? '',
       invitadoNombre: (data['invitadoNombre'] as String?) ?? '',
       invitadoCi: (data['invitadoCi'] as String?) ?? '',
       placaVehiculo: data['placaVehiculo'],

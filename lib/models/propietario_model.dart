@@ -1,13 +1,14 @@
 class Casa {
   final String nombre;
-  final int numero;
+  // Identificador de casa: puede ser numérico ("21") o texto ("Acacia 21").
+  final String numero;
 
   Casa({required this.nombre, required this.numero});
 
   factory Casa.fromJson(Map<String, dynamic> json) {
     return Casa(
       nombre: json['nombre'],
-      numero: json['numero'],
+      numero: json['numero'].toString(),
     );
   }
 

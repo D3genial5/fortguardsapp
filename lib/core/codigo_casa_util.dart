@@ -53,7 +53,7 @@ class CodigoCasaUtil {
   static Future<Map<String, dynamic>> generarNuevoCodigo({
     required String identificador,
     required String condominioId,
-    required int casaNumero,
+    required String casaNumero,
     required Duration duracion,
     required int usos,
   }) async {
@@ -91,7 +91,7 @@ class CodigoCasaUtil {
   static Future<bool> verificarCodigo({
     required String codigo,
     required String condominioId,
-    required int casaNumero,
+    required String casaNumero,
   }) async {
     // Buscar condominio ignorando mayúsculas/minúsculas
     DocumentReference<Map<String, dynamic>>? condoRef;
@@ -179,7 +179,7 @@ class CodigoCasaUtil {
   static Future<void> _regenerarCodigoAutomaticamente({
     required String identificador,
     required String condominioId,
-    required int casaNumero,
+    required String casaNumero,
   }) async {
     // Guard: evitar regeneraciones múltiples simultáneas
     if (_regenerando[identificador] == true) return;
@@ -251,7 +251,7 @@ class CodigoCasaUtil {
   static StreamSubscription<DocumentSnapshot> iniciarAutoRenovacionCodigo({
     required String identificador,
     required String condominioId,
-    required int casaNumero,
+    required String casaNumero,
   }) {
     final docRef = FirebaseFirestore.instance
         .collection('condominios')
