@@ -16,9 +16,9 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    // namespace = applicationId = package de MainActivity (com.example.fortguardsapp)
+    // namespace = applicationId = package de MainActivity (com.fortguards.app)
     // para que el manifest ".MainActivity" resuelva a la clase real.
-    namespace = "com.example.fortguardsapp"
+    namespace = "com.fortguards.app"
     compileSdk = 36
     ndkVersion = "27.0.12077973"
 
@@ -33,11 +33,10 @@ android {
     }
 
     defaultConfig {
-        // NOTA(prod/handover): registrar el package definitivo (p.ej.
-        // com.fortguardsapp) en Firebase y regenerar google-services.json con
-        // `flutterfire configure`. Por ahora se usa el package registrado en el
-        // proyecto dev (fortguard-9bba5) para que el build funcione.
-        applicationId = "com.example.fortguardsapp"
+        // Package de producción. Requiere registrar la app Android
+        // com.fortguards.app en el proyecto Firebase de producción y regenerar
+        // google-services.json con `flutterfire configure` (ver PRODUCCION.md).
+        applicationId = "com.fortguards.app"
         // firebase_auth 23.x requiere minSdk >= 23.
         minSdk = 23
         targetSdk = flutter.targetSdkVersion

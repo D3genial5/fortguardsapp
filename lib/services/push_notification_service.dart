@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import '../core/fcm_topics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -430,30 +431,30 @@ class PushNotificationService {
       case 'propietario':
         if (_condominio != null) {
           // Topic del condominio para avisos generales
-          await _fcm.subscribeToTopic('condo_$_condominio');
-          if (kDebugMode) debugPrint('📢 Suscrito a: condo_$_condominio');
-          
+          await _fcm.subscribeToTopic(fcmTopic('condo_$_condominio'));
+          if (kDebugMode) debugPrint('📢 Suscrito a: ${fcmTopic('condo_$_condominio')}');
+
           if (_casaNumero != null) {
             // Topic específico del propietario
-            await _fcm.subscribeToTopic('prop_${_condominio}_$_casaNumero');
-            if (kDebugMode) debugPrint('Suscrito a: prop_${_condominio}_$_casaNumero');
+            await _fcm.subscribeToTopic(fcmTopic('prop_${_condominio}_$_casaNumero'));
+            if (kDebugMode) debugPrint('Suscrito a: ${fcmTopic('prop_${_condominio}_$_casaNumero')}');
           }
         }
         break;
-        
+
       case 'guardia':
         if (_condominio != null) {
           // Topic del condominio para guardias
-          await _fcm.subscribeToTopic('guardia_$_condominio');
-          if (kDebugMode) debugPrint('📢 Suscrito a: guardia_$_condominio');
+          await _fcm.subscribeToTopic(fcmTopic('guardia_$_condominio'));
+          if (kDebugMode) debugPrint('📢 Suscrito a: ${fcmTopic('guardia_$_condominio')}');
         }
         break;
-        
+
       case 'visitante':
         if (_qrCodigo != null) {
           // Topic del QR específico
-          await _fcm.subscribeToTopic('qr_$_qrCodigo');
-          if (kDebugMode) debugPrint('📢 Suscrito a: qr_$_qrCodigo');
+          await _fcm.subscribeToTopic(fcmTopic('qr_$_qrCodigo'));
+          if (kDebugMode) debugPrint('📢 Suscrito a: ${fcmTopic('qr_$_qrCodigo')}');
         }
         break;
     }

@@ -1,4 +1,4 @@
-package com.example.fortguardsapp
+package com.fortguards.app
 
 import io.flutter.embedding.android.FlutterActivity
 

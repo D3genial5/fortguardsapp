@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../core/fcm_topics.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../core/app_log.dart';
@@ -111,12 +112,12 @@ class NotificacionService {
       final messaging = FirebaseMessaging.instance;
       
       // Suscribirse al tópico del condominio (notificaciones generales)
-      await messaging.subscribeToTopic('condo_$condominio');
-      AppLog.log('✅ Suscrito a tópico: condo_$condominio', name: 'NotificacionService');
-      
+      await messaging.subscribeToTopic(fcmTopic('condo_$condominio'));
+      AppLog.log('✅ Suscrito a tópico: ${fcmTopic('condo_$condominio')}', name: 'NotificacionService');
+
       // Suscribirse al tópico específico de la casa
-      await messaging.subscribeToTopic('prop_${condominio}_$casaNumero');
-      AppLog.log('✅ Suscrito a tópico: prop_${condominio}_$casaNumero', name: 'NotificacionService');
+      await messaging.subscribeToTopic(fcmTopic('prop_${condominio}_$casaNumero'));
+      AppLog.log('✅ Suscrito a tópico: ${fcmTopic('prop_${condominio}_$casaNumero')}', name: 'NotificacionService');
       
     } catch (e) {
       AppLog.log('⚠️ Error suscribiéndose a tópicos: $e', name: 'NotificacionService');
@@ -131,8 +132,8 @@ class NotificacionService {
     try {
       final messaging = FirebaseMessaging.instance;
       
-      await messaging.unsubscribeFromTopic('condo_$condominio');
-      await messaging.unsubscribeFromTopic('prop_${condominio}_$casaNumero');
+      await messaging.unsubscribeFromTopic(fcmTopic('condo_$condominio'));
+      await messaging.unsubscribeFromTopic(fcmTopic('prop_${condominio}_$casaNumero'));
       
       AppLog.log('✅ Desuscrito de tópicos de $condominio', name: 'NotificacionService');
     } catch (e) {

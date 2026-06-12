@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import '../core/fcm_topics.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -271,7 +272,7 @@ class NotificationService {
   // Suscribirse a topic del condominio
   Future<void> subscribeToCondominio(String condominioId) async {
     try {
-      await _fcm.subscribeToTopic('condominio_$condominioId');
+      await _fcm.subscribeToTopic(fcmTopic('condominio_$condominioId'));
       if (kDebugMode) debugPrint('Suscrito al topic: condominio_$condominioId');
     } catch (e) {
       if (kDebugMode) debugPrint('Error suscribiendo a topic: $e');
@@ -281,7 +282,7 @@ class NotificationService {
   // Desuscribirse de topic del condominio
   Future<void> unsubscribeFromCondominio(String condominioId) async {
     try {
-      await _fcm.unsubscribeFromTopic('condominio_$condominioId');
+      await _fcm.unsubscribeFromTopic(fcmTopic('condominio_$condominioId'));
       if (kDebugMode) debugPrint('Desuscrito del topic: condominio_$condominioId');
     } catch (e) {
       if (kDebugMode) debugPrint('Error desuscribiendo de topic: $e');
