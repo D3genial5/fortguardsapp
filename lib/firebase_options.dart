@@ -56,19 +56,18 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyB54Uz8WJWYnLy7ovMwZkeOiGglK-Td67U',
-    appId: '1:1048827407544:android:51c9f4da181132e208184d',
-    messagingSenderId: '1048827407544',
-    projectId: 'fortguard-9bba5',
-    storageBucket: 'fortguard-9bba5.firebasestorage.app',
+    apiKey: 'AIzaSyCISoHLLNxrzvzfyhBXAobqCw28Jkcwcio',
+    appId: '1:681753776306:android:d16cfec9ba3ef3b2ac39ab',
+    messagingSenderId: '681753776306',
+    projectId: 'fortguards-prod',
+    storageBucket: 'fortguards-prod.firebasestorage.app',
   );
-
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyB54Uz8WJWYnLy7ovMwZkeOiGglK-Td67U',
-    appId: '1:1048827407544:ios:YOUR_IOS_APP_ID',
-    messagingSenderId: '1048827407544',
-    projectId: 'fortguard-9bba5',
-    storageBucket: 'fortguard-9bba5.firebasestorage.app',
-    iosBundleId: 'com.example.fortguardsapp',
+    apiKey: 'AIzaSyDIY1L2uq2STJSZ9bpmYP83gtuZKgzmnLI',
+    appId: '1:681753776306:ios:61bee8f1767f9daeac39ab',
+    messagingSenderId: '681753776306',
+    projectId: 'fortguards-prod',
+    storageBucket: 'fortguards-prod.firebasestorage.app',
+    iosBundleId: 'com.fortguards.app',
   );
 }

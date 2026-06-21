@@ -313,7 +313,8 @@ class _LoginScreenState extends State<LoginScreen>
                 TextField(
                   controller: _casaController,
                   decoration: const InputDecoration(labelText: 'CASA'),
-                  keyboardType: TextInputType.number,
+                  // Texto: la casa puede ser nombre ("Acacia 21"), no solo número.
+                  keyboardType: TextInputType.text,
                 ),
                 const SizedBox(height: 16),
                 TextField(

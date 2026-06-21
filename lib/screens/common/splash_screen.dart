@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Pantalla de bienvenida que se muestra al abrir la app y redirige al flujo
 /// principal (`/`) tras una breve pausa.
@@ -17,8 +18,19 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    _timer = Timer(const Duration(milliseconds: 1800), () {
-      if (mounted) context.go('/');
+    _timer = Timer(const Duration(milliseconds: 1800), () async {
+      if (!mounted) return;
+      // Registro de visitante = una sola vez por dispositivo. Si ya se registró
+      // y aceptó términos, se salta el formulario y va directo al acceso.
+      final prefs = await SharedPreferences.getInstance();
+      final registrado = prefs.getBool('visitante_registrado') ?? false;
+      final terminos = prefs.getBool('terminos_aceptados') ?? false;
+      if (!mounted) return;
+      if (registrado && terminos) {
+        context.go('/acceso-general');
+      } else {
+        context.go('/');
+      }
     });
   }
 
