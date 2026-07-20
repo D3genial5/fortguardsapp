@@ -21,6 +21,9 @@ import 'screens/common/terms_screen.dart';
 import 'screens/common/splash_screen.dart';
 
 /// Rutas que NO requieren sesión de propietario.
+/// Incluye todo el flujo de VISITANTE: mis QRs, invitados y solicitud de
+/// acceso usan la identidad del visitante (SecureStorage), no la del
+/// propietario, y cada pantalla maneja sola el caso "sin registro".
 const _publicRoutes = <String>{
   '/',
   '/splash',
@@ -29,6 +32,9 @@ const _publicRoutes = <String>{
   '/acceso-general',
   '/seleccion-condominio',
   '/qr-casa',
+  '/mi-qr',
+  '/mis-qrs',
+  '/solicitud-acceso',
   '/help',
   '/about',
   '/terms',
