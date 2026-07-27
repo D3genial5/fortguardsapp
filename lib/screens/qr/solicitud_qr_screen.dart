@@ -93,7 +93,10 @@ class _SolicitudQrScreenState extends State<SolicitudQrScreen> {
         const SnackBar(content: Text('Solicitud enviada')),
       );
 
-      context.go('/mi-qr');
+      // pushReplacement (no go): reemplaza esta pantalla por /mi-qr pero
+      // conserva el historial previo, para que el boton atras vuelva al inicio
+      // en vez de dejar la pila vacia.
+      context.pushReplacement('/mi-qr');
     } on FirebaseException catch (e) {
       // Error de Firestore: muestra motivo
       if (!mounted) return;

@@ -116,7 +116,9 @@ class _QrCasaScreenState extends State<QrCasaScreen> {
       await prefs.setBool('qr_pendiente', false);
 
       if (!mounted) return;
-      context.go('/seleccion-accion');
+      // pushReplacement: el QR ya fue usado, se reemplaza por la pantalla de
+      // acciones, pero se conserva el historial para que atras vuelva al inicio.
+      context.pushReplacement('/seleccion-accion');
     });
   }
 
@@ -511,7 +513,11 @@ class _QrCasaScreenState extends State<QrCasaScreen> {
                         Text(_error!, textAlign: TextAlign.center),
                         const SizedBox(height: 24),
                         FilledButton(
-                          onPressed: () => context.go('/seleccion-accion'),
+                          // Volver de verdad a la pantalla anterior; solo si no
+                          // hay historial se cae al inicio del flujo de visita.
+                          onPressed: () => context.canPop()
+                              ? context.pop()
+                              : context.go('/seleccion-accion'),
                           style: FilledButton.styleFrom(
                             minimumSize: const Size.fromHeight(52),
                           ),
