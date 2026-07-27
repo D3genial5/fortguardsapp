@@ -541,7 +541,7 @@ class _QrCasaScreenState extends State<QrCasaScreen> {
                           ),
                           const SizedBox(height: 16),
                           FilledButton(
-                            onPressed: () => context.go('/registro-visita'),
+                            onPressed: () => context.go('/'),
                             style: FilledButton.styleFrom(
                               minimumSize: const Size.fromHeight(52),
                             ),

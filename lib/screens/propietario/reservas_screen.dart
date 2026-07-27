@@ -216,7 +216,10 @@ class _ReservasScreenState extends State<ReservasScreen> with SingleTickerProvid
 
     await showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      // StatefulBuilder: los date/time pickers escriben en los controllers y el
+      // diálogo debe repintarse para que el usuario vea la hora elegida.
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
         title: Text('Reservar ${area['nombre']}'),
         content: Form(
           key: formKey,
@@ -233,8 +236,10 @@ class _ReservasScreenState extends State<ReservasScreen> with SingleTickerProvid
                       lastDate: DateTime.now().add(const Duration(days: 90)),
                     );
                     if (fecha != null) {
-                      fechaSeleccionada = fecha;
-                      fechaController.text = DateFormat('dd/MM/yyyy').format(fecha);
+                      setDialogState(() {
+                        fechaSeleccionada = fecha;
+                        fechaController.text = DateFormat('dd/MM/yyyy').format(fecha);
+                      });
                     }
                   },
                   child: AbsorbPointer(
@@ -267,7 +272,9 @@ class _ReservasScreenState extends State<ReservasScreen> with SingleTickerProvid
                             ),
                           );
                           if (hora != null) {
-                            horaInicioController.text = '${hora.hour.toString().padLeft(2, '0')}:${hora.minute.toString().padLeft(2, '0')}';
+                            setDialogState(() {
+                              horaInicioController.text = '${hora.hour.toString().padLeft(2, '0')}:${hora.minute.toString().padLeft(2, '0')}';
+                            });
                           }
                         },
                         child: AbsorbPointer(
@@ -299,7 +306,9 @@ class _ReservasScreenState extends State<ReservasScreen> with SingleTickerProvid
                             ),
                           );
                           if (hora != null) {
-                            horaFinController.text = '${hora.hour.toString().padLeft(2, '0')}:${hora.minute.toString().padLeft(2, '0')}';
+                            setDialogState(() {
+                              horaFinController.text = '${hora.hour.toString().padLeft(2, '0')}:${hora.minute.toString().padLeft(2, '0')}';
+                            });
                           }
                         },
                         child: AbsorbPointer(
@@ -395,7 +404,16 @@ class _ReservasScreenState extends State<ReservasScreen> with SingleTickerProvid
                   
                   // Verificar conflictos con reservas existentes
                   for (final doc in reservasExistentes.docs) {
-                    
+                    // Las reservas canceladas o rechazadas ya no ocupan el
+                    // horario: si no se filtran, una reserva vieja bloquea el
+                    // area para siempre.
+                    final estadoExistente =
+                        doc.data()['estado']?.toString().toLowerCase() ?? 'pendiente';
+                    if (estadoExistente == 'cancelada' ||
+                        estadoExistente == 'rechazada') {
+                      continue;
+                    }
+
                     // Convertir strings a DateTime para comparación
                     final horaInicioNuevaMinutos = _convertirHoraAMinutos(horaInicioNueva);
                     final horaFinNuevaMinutos = _convertirHoraAMinutos(horaFinNueva);
@@ -477,6 +495,7 @@ class _ReservasScreenState extends State<ReservasScreen> with SingleTickerProvid
             child: const Text('Reservar'),
           ),
         ],
+        ),
       ),
     );
   }
