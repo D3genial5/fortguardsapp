@@ -39,7 +39,9 @@ android {
         applicationId = "com.fortguards.app"
         // firebase_auth 23.x requiere minSdk >= 23.
         minSdk = 23
-        targetSdk = flutter.targetSdkVersion
+        // API 36 (Android 16): exigido por Google Play desde el 30/08/2026.
+        // Se fija explicitamente porque el SDK de Flutter todavia apunta a 35.
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
