@@ -78,6 +78,8 @@ flutter_launcher_icons:
   ios: true
   image_path: "assets/icon/app_icon.png"
   # iOS no admite transparencia en el icono: App Store Connect rechaza la subida.
+  remove_alpha_ios: true
+  background_color_ios: "#000000"
   min_sdk_android: 21
   adaptive_icon_background: "#000000"
   adaptive_icon_foreground: "assets/icon/app_icon.png"
