@@ -479,9 +479,32 @@ class PushNotificationService {
   
   // Guardar token FCM
   Future<void> _saveToken() async {
-    final token = await _fcm.getToken();
+    final token = await _obtenerTokenFcm();
     if (token != null) {
       await _updateToken(token);
+    }
+  }
+  
+  // En iOS, FCM no entrega el token hasta que APNs registró el dispositivo.
+  // Si se pide antes, getToken() lanza una excepción. Esperamos el token de
+  // APNs con reintentos; si aún no llega, onTokenRefresh lo recupera después.
+  Future<String?> _obtenerTokenFcm() async {
+    try {
+      if (Platform.isIOS) {
+        var apnsToken = await _fcm.getAPNSToken();
+        for (var intento = 0; apnsToken == null && intento < 5; intento++) {
+          await Future.delayed(const Duration(seconds: 1));
+          apnsToken = await _fcm.getAPNSToken();
+        }
+        if (apnsToken == null) {
+          if (kDebugMode) debugPrint('⚠️ APNs aún no entrega token; se reintentará');
+          return null;
+        }
+      }
+      return await _fcm.getToken();
+    } catch (e) {
+      if (kDebugMode) debugPrint('Error obteniendo token FCM: $e');
+      return null;
     }
   }
   
@@ -531,7 +554,7 @@ class PushNotificationService {
   
   // Obtener token actual
   Future<String?> getToken() async {
-    return await _fcm.getToken();
+    return await _obtenerTokenFcm();
   }
   
   // Verificar si las notificaciones están habilitadas
