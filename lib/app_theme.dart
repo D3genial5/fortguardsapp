@@ -89,7 +89,7 @@ class AppTheme {
     ),
 
     // Cards
-    cardTheme: CardTheme(
+    cardTheme: CardThemeData(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       elevation: 0,
       shadowColor: Colors.black.withValues(alpha: 0.06),
@@ -245,7 +245,7 @@ class AppTheme {
     ),
 
     // Dialog
-    dialogTheme: DialogTheme(
+    dialogTheme: DialogThemeData(
       backgroundColor: _surface,
       elevation: 4,
       shadowColor: Colors.black.withValues(alpha: 0.15),
@@ -309,7 +309,7 @@ class AppTheme {
     ),
 
     // Tab Bar
-    tabBarTheme: const TabBarTheme(
+    tabBarTheme: const TabBarThemeData(
       labelColor: _primary,
       unselectedLabelColor: _textMuted,
       indicatorColor: _primary,
@@ -423,7 +423,7 @@ class AppTheme {
         letterSpacing: 0.2,
       ),
     ),
-    cardTheme: CardTheme(
+    cardTheme: CardThemeData(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       elevation: 0,
       color: _darkSurface,

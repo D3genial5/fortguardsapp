@@ -38,7 +38,7 @@ dependencies:
   qr_flutter: ^4.1.0
   screen_protector: ^1.5.1
   shared_preferences: ^2.2.2
-  intl: ^0.19.0
+  intl: ^0.20.3
   # Firebase — alineado con admin_fortguards (3.x)
   firebase_core: ^3.14.0
   firebase_auth: ^5.6.2
@@ -77,6 +77,7 @@ flutter_launcher_icons:
   android: true
   ios: true
   image_path: "assets/icon/app_icon.png"
+  # iOS no admite transparencia en el icono: App Store Connect rechaza la subida.
   min_sdk_android: 21
   adaptive_icon_background: "#000000"
   adaptive_icon_foreground: "assets/icon/app_icon.png"
