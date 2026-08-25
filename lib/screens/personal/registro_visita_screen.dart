@@ -177,10 +177,23 @@ class _RegistroVisitaScreenState extends State<RegistroVisitaScreen>
             break;
         }
       });
+    } on PlatformException catch (e) {
+      if (!mounted) return;
+      // image_picker devuelve estos codigos cuando el usuario niega el permiso.
+      // Sin esto se le mostraba la excepcion cruda, en ingles.
+      final mensaje = switch (e.code) {
+        'camera_access_denied' =>
+          'No tienes habilitado el acceso a la camara. Actívalo en Ajustes > Fortguards > Cámara.',
+        'photo_access_denied' =>
+          'No tienes habilitado el acceso a tus fotos. Actívalo en Ajustes > Fortguards > Fotos.',
+        _ => 'No se pudo abrir la cámara ni la galería. Intenta de nuevo.',
+      };
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(mensaje)));
     } catch (e) {
+      if (kDebugMode) debugPrint('Error al seleccionar imagen: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al seleccionar imagen: $e')),
+          const SnackBar(content: Text('No se pudo seleccionar la imagen. Intenta de nuevo.')),
         );
       }
     }
@@ -299,6 +312,17 @@ class _RegistroVisitaScreenState extends State<RegistroVisitaScreen>
     final ci = _ciController.text.trim();
     final placa = _placaController.text.trim();
 
+    // El consentimiento va antes de enviar nada: si el visitante no acepta,
+    // ni sus datos ni las fotos de su documento salen del telefono.
+    final prefsTerminos = await SharedPreferences.getInstance();
+    if (!(prefsTerminos.getBool('terminos_aceptados') ?? false)) {
+      final acepto = await _mostrarDialogoTerminos();
+      if (!mounted) return;
+      if (!acepto) return;
+      await prefsTerminos.setBool('terminos_aceptados', true);
+      if (!mounted) return;
+    }
+
     setState(() => _isLoading = true);
 
     final valido = await _validarCarnetConOcr();
@@ -399,19 +423,11 @@ class _RegistroVisitaScreenState extends State<RegistroVisitaScreen>
         ),
       );
 
-      // Esperar 2 segundos y mostrar diálogo de términos
+      // Los terminos ya se aceptaron antes de subir nada; aqui solo dejamos
+      // ver la confirmacion y continuamos.
       await Future.delayed(const Duration(seconds: 2));
       if (!mounted) return;
-
-      final acepto = await _mostrarDialogoTerminos();
-      if (!mounted) return;
-
-      if (acepto) {
-        final p = await SharedPreferences.getInstance();
-        await p.setBool('terminos_aceptados', true);
-        if (!mounted) return;
-        context.go('/acceso-general');
-      }
+      context.go('/acceso-general');
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
