@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -269,26 +270,39 @@ class _RegistroVisitaScreenState extends State<RegistroVisitaScreen>
     );
   }
 
+  /// Sube una foto a Storage. Devuelve la URL o `null` si no se pudo.
+  ///
+  /// Storage reintenta por su cuenta hasta 10 minutos ante un error de
+  /// permisos, lo que dejaba el boton de registro "cargando" indefinidamente.
+  /// Por eso se acota con un timeout explicito y se libera la suscripcion de
+  /// progreso al terminar.
   Future<String?> _subirFoto(File foto, String nombre) async {
+    StreamSubscription<TaskSnapshot>? progreso;
     try {
       final ref = FirebaseStorage.instance
           .ref()
           .child('visitantes')
           .child('${_ciController.text.trim()}_$nombre.jpg');
-      
+
       final uploadTask = ref.putFile(foto);
-      
-      uploadTask.snapshotEvents.listen((event) {
-        setState(() {
-          _uploadProgress = event.bytesTransferred / event.totalBytes;
-        });
-      });
-      
-      await uploadTask;
-      return await ref.getDownloadURL();
+
+      progreso = uploadTask.snapshotEvents.listen(
+        (event) {
+          if (!mounted || event.totalBytes <= 0) return;
+          setState(() {
+            _uploadProgress = event.bytesTransferred / event.totalBytes;
+          });
+        },
+        onError: (_) {}, // el error real se maneja en el await de abajo
+      );
+
+      await uploadTask.timeout(const Duration(seconds: 60));
+      return await ref.getDownloadURL().timeout(const Duration(seconds: 20));
     } catch (e) {
       if (kDebugMode) debugPrint('Error subiendo foto: $e');
       return null;
+    } finally {
+      await progreso?.cancel();
     }
   }
 
@@ -313,6 +327,21 @@ class _RegistroVisitaScreenState extends State<RegistroVisitaScreen>
     }
 
     try {
+      // ----------------------------------------------------------------
+      // 0) Sesion anonima ANTES de tocar Storage: las reglas exigen
+      //    request.auth != null. Si el anon auth del arranque fallo y se sube
+      //    sin sesion, Storage rechaza y reintenta por minutos.
+      // ----------------------------------------------------------------
+      if (FirebaseAuth.instance.currentUser == null) {
+        try {
+          await FirebaseAuth.instance
+              .signInAnonymously()
+              .timeout(const Duration(seconds: 20));
+        } catch (e) {
+          if (kDebugMode) debugPrint('Anon auth en save falló: $e');
+        }
+      }
+
       String? urlCarnetFrente;
       String? urlCarnetReverso;
       String? urlPlaca;
@@ -343,16 +372,9 @@ class _RegistroVisitaScreenState extends State<RegistroVisitaScreen>
       if (urlPlaca != null) await prefs.setString('visitante_placaUrl', urlPlaca);
 
       // ----------------------------------------------------------------
-      // 2) Subir a Firestore — requiere auth.uid (anon o propietario)
-      //    Si por algún motivo no hay user, intentamos anon ahora mismo.
+      // 2) Subir a Firestore — requiere auth.uid (anon o propietario).
+      //    La sesion ya se aseguro en el paso 0.
       // ----------------------------------------------------------------
-      if (FirebaseAuth.instance.currentUser == null) {
-        try {
-          await FirebaseAuth.instance.signInAnonymously();
-        } catch (e) {
-          if (kDebugMode) debugPrint('Anon auth en save falló: $e');
-        }
-      }
       final uid = FirebaseAuth.instance.currentUser?.uid;
       final visitanteData = {
         'nombre': nombre,
@@ -383,17 +405,35 @@ class _RegistroVisitaScreenState extends State<RegistroVisitaScreen>
 
       if (!mounted) return;
 
-      // Mostrar éxito
+      // Si se eligieron fotos pero ninguna subió, avisar en vez de fallar en
+      // silencio: el registro igual queda hecho con los datos personales.
+      final fotosElegidas = [_fotoCarnetFrente, _fotoCarnetReverso, _fotoPlaca]
+          .where((f) => f != null)
+          .length;
+      final fotosSubidas = [urlCarnetFrente, urlCarnetReverso, urlPlaca]
+          .where((u) => u != null)
+          .length;
+      final faltaronFotos = fotosElegidas > 0 && fotosSubidas < fotosElegidas;
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Row(
+          content: Row(
             children: [
-              Icon(Icons.check_circle, color: Colors.white),
-              SizedBox(width: 12),
-              Text('¡Registro completado!'),
+              Icon(
+                faltaronFotos ? Icons.warning_amber_rounded : Icons.check_circle,
+                color: Colors.white,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  faltaronFotos
+                      ? 'Registro completado, pero no se pudieron subir las fotos'
+                      : '¡Registro completado!',
+                ),
+              ),
             ],
           ),
-          backgroundColor: Colors.green,
+          backgroundColor: faltaronFotos ? Colors.orange : Colors.green,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
